@@ -323,7 +323,110 @@ declare class EcoinventProcess extends InterfaceBase {
     getFile(fileType: ProcessFileType, directory: string): Promise<string>;
 }
 
+/**
+ * Interface for process information
+ */
+interface ProcessInfo {
+    path?: string;
+    filename?: string;
+    activity_name?: string;
+    reference_product?: string;
+    geography?: string;
+    [key: string]: any;
+}
+/**
+ * Class for mapping between local and remote processes
+ */
+declare class ProcessMapping {
+    settings: Settings;
+    storage: CachedStorage;
+    /**
+     * Create a new ProcessMapping instance
+     *
+     * @param settings Settings object
+     * @param storage Optional CachedStorage object
+     */
+    constructor(settings: Settings, storage?: CachedStorage);
+    /**
+     * Create a mapping of remote processes
+     *
+     * @param version Version identifier
+     * @param systemModel System model identifier
+     * @param maxId Maximum process ID to include
+     */
+    createRemoteMapping(version: string, systemModel: string, maxId: number): Promise<ProcessInfo[]>;
+    /**
+     * Create a mapping of local processes
+     *
+     * @param key Cache key for the release
+     * @param verbose Whether to log verbose information
+     */
+    createLocalMapping(key: string, verbose?: boolean): ProcessInfo[];
+}
+
+/**
+ * Log levels
+ */
+declare enum LogLevel {
+    ERROR = 0,
+    WARN = 1,
+    INFO = 2,
+    DEBUG = 3
+}
+/**
+ * Set the global log level
+ *
+ * @param level Log level
+ */
+declare function setLogLevel(level: LogLevel): void;
+/**
+ * Logger class
+ */
+declare class Logger {
+    name: string;
+    /**
+     * Create a new logger
+     *
+     * @param name Logger name
+     */
+    constructor(name: string);
+    /**
+     * Log an error message
+     *
+     * @param message Message to log
+     * @param args Additional arguments
+     */
+    error(message: string, ...args: any[]): void;
+    /**
+     * Log a warning message
+     *
+     * @param message Message to log
+     * @param args Additional arguments
+     */
+    warn(message: string, ...args: any[]): void;
+    /**
+     * Log an info message
+     *
+     * @param message Message to log
+     * @param args Additional arguments
+     */
+    info(message: string, ...args: any[]): void;
+    /**
+     * Log a debug message
+     *
+     * @param message Message to log
+     * @param args Additional arguments
+     */
+    debug(message: string, ...args: any[]): void;
+}
+/**
+ * Get a logger for a specific name
+ *
+ * @param name Logger name
+ */
+declare function getLogger(name: string): Logger;
+
 declare const VERSION = "1.0.0";
 
-export { CachedStorage, EcoinventProcess, EcoinventRelease, InterfaceBase, ProcessFileType, ReleaseType, SYSTEM_MODELS, SYSTEM_MODELS_REVERSE, Settings, URLS, VERSION, permanentSetting };
+export { CachedStorage, EcoinventProcess, EcoinventRelease, InterfaceBase, LogLevel, Logger, ProcessFileType, ProcessMapping, ReleaseType, SYSTEM_MODELS, SYSTEM_MODELS_REVERSE, Settings, URLS, VERSION, getLogger, permanentSetting, setLogLevel };
 export type { CacheEntry, Catalogue, FileMetadata, ISettings };

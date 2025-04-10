@@ -1,5 +1,6 @@
 import { InterfaceBase, formatDict } from '../core/interface-base';
 import { FileMetadata, SYSTEM_MODELS } from '../types';
+import { distance } from 'fastest-levenshtein';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -172,19 +173,35 @@ export class EcoinventRelease extends InterfaceBase {
     forceRedownload: boolean = false
   ): Promise<string> {
     const abbr = SYSTEM_MODELS[systemModel] || systemModel;
-    const filename = formatReleaseFilename(releaseType, version, abbr);
+    let actualFilename = formatReleaseFilename(releaseType, version, abbr);
 
     const availableFiles = await this._filenameDict(version);
 
-    if (!availableFiles[filename]) {
-      throw new Error(`Release file ${filename} not found`);
+    if (!availableFiles[actualFilename]) {
+      // Sometimes the filename prediction doesn't work, as not every filename
+      // follows our patterns. But these exceptions are unpredictable, it's
+      // just easier to find the closest match and log the correction
+      // than build a catalogue of exceptions.
+      const possibleMatches = Object.keys(availableFiles).map(name => {
+        return { distance: distance(actualFilename, name), name };
+      }).sort((a, b) => a.distance - b.distance);
+
+      const closestMatch = possibleMatches[0];
+
+      if (closestMatch && closestMatch.distance <= 3) {
+        console.log(`Using close match ${closestMatch.name} for predicted filename ${actualFilename}`);
+        actualFilename = closestMatch.name;
+      } else {
+        const availableFilenames = Object.keys(availableFiles).join('\n\t');
+        throw new Error(`Release file ${actualFilename} not found. Closest match is ${closestMatch?.name}. \nFilenames for this version:\n\t${availableFilenames}`);
+      }
     }
 
     return this._downloadAndCache(
-      filename,
-      availableFiles[filename].uuid,
-      availableFiles[filename].modified,
-      availableFiles[filename].size,
+      actualFilename,
+      availableFiles[actualFilename].uuid,
+      availableFiles[actualFilename].modified,
+      availableFiles[actualFilename].size,
       'r',
       extract,
       forceRedownload,

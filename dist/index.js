@@ -721,6 +721,132 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], InterfaceBase.prototype, "_getFilesForVersion", null);
 
+const peq = new Uint32Array(0x10000);
+const myers_32 = (a, b) => {
+    const n = a.length;
+    const m = b.length;
+    const lst = 1 << (n - 1);
+    let pv = -1;
+    let mv = 0;
+    let sc = n;
+    let i = n;
+    while (i--) {
+        peq[a.charCodeAt(i)] |= 1 << i;
+    }
+    for (i = 0; i < m; i++) {
+        let eq = peq[b.charCodeAt(i)];
+        const xv = eq | mv;
+        eq |= ((eq & pv) + pv) ^ pv;
+        mv |= ~(eq | pv);
+        pv &= eq;
+        if (mv & lst) {
+            sc++;
+        }
+        if (pv & lst) {
+            sc--;
+        }
+        mv = (mv << 1) | 1;
+        pv = (pv << 1) | ~(xv | mv);
+        mv &= xv;
+    }
+    i = n;
+    while (i--) {
+        peq[a.charCodeAt(i)] = 0;
+    }
+    return sc;
+};
+const myers_x = (b, a) => {
+    const n = a.length;
+    const m = b.length;
+    const mhc = [];
+    const phc = [];
+    const hsize = Math.ceil(n / 32);
+    const vsize = Math.ceil(m / 32);
+    for (let i = 0; i < hsize; i++) {
+        phc[i] = -1;
+        mhc[i] = 0;
+    }
+    let j = 0;
+    for (; j < vsize - 1; j++) {
+        let mv = 0;
+        let pv = -1;
+        const start = j * 32;
+        const vlen = Math.min(32, m) + start;
+        for (let k = start; k < vlen; k++) {
+            peq[b.charCodeAt(k)] |= 1 << k;
+        }
+        for (let i = 0; i < n; i++) {
+            const eq = peq[a.charCodeAt(i)];
+            const pb = (phc[(i / 32) | 0] >>> i) & 1;
+            const mb = (mhc[(i / 32) | 0] >>> i) & 1;
+            const xv = eq | mv;
+            const xh = ((((eq | mb) & pv) + pv) ^ pv) | eq | mb;
+            let ph = mv | ~(xh | pv);
+            let mh = pv & xh;
+            if ((ph >>> 31) ^ pb) {
+                phc[(i / 32) | 0] ^= 1 << i;
+            }
+            if ((mh >>> 31) ^ mb) {
+                mhc[(i / 32) | 0] ^= 1 << i;
+            }
+            ph = (ph << 1) | pb;
+            mh = (mh << 1) | mb;
+            pv = mh | ~(xv | ph);
+            mv = ph & xv;
+        }
+        for (let k = start; k < vlen; k++) {
+            peq[b.charCodeAt(k)] = 0;
+        }
+    }
+    let mv = 0;
+    let pv = -1;
+    const start = j * 32;
+    const vlen = Math.min(32, m - start) + start;
+    for (let k = start; k < vlen; k++) {
+        peq[b.charCodeAt(k)] |= 1 << k;
+    }
+    let score = m;
+    for (let i = 0; i < n; i++) {
+        const eq = peq[a.charCodeAt(i)];
+        const pb = (phc[(i / 32) | 0] >>> i) & 1;
+        const mb = (mhc[(i / 32) | 0] >>> i) & 1;
+        const xv = eq | mv;
+        const xh = ((((eq | mb) & pv) + pv) ^ pv) | eq | mb;
+        let ph = mv | ~(xh | pv);
+        let mh = pv & xh;
+        score += (ph >>> (m - 1)) & 1;
+        score -= (mh >>> (m - 1)) & 1;
+        if ((ph >>> 31) ^ pb) {
+            phc[(i / 32) | 0] ^= 1 << i;
+        }
+        if ((mh >>> 31) ^ mb) {
+            mhc[(i / 32) | 0] ^= 1 << i;
+        }
+        ph = (ph << 1) | pb;
+        mh = (mh << 1) | mb;
+        pv = mh | ~(xv | ph);
+        mv = ph & xv;
+    }
+    for (let k = start; k < vlen; k++) {
+        peq[b.charCodeAt(k)] = 0;
+    }
+    return score;
+};
+const distance = (a, b) => {
+    if (a.length < b.length) {
+        const tmp = b;
+        b = a;
+        a = tmp;
+    }
+    if (b.length === 0) {
+        return a.length;
+    }
+    if (a.length <= 32) {
+        return myers_32(a, b);
+    }
+    return myers_x(a, b);
+};
+
 /**
  * Enum for different types of release files
  */
@@ -838,12 +964,27 @@ class EcoinventRelease extends InterfaceBase {
      */
     async getRelease(version, systemModel, releaseType, extract = true, forceRedownload = false) {
         const abbr = SYSTEM_MODELS[systemModel] || systemModel;
-        const filename = formatReleaseFilename(releaseType, version, abbr);
+        let actualFilename = formatReleaseFilename(releaseType, version, abbr);
         const availableFiles = await this._filenameDict(version);
-        if (!availableFiles[filename]) {
-            throw new Error(`Release file ${filename} not found`);
+        if (!availableFiles[actualFilename]) {
+            // Sometimes the filename prediction doesn't work, as not every filename
+            // follows our patterns. But these exceptions are unpredictable, it's
+            // just easier to find the closest match and log the correction
+            // than build a catalogue of exceptions.
+            const possibleMatches = Object.keys(availableFiles).map(name => {
+                return { distance: distance(actualFilename, name), name };
+            }).sort((a, b) => a.distance - b.distance);
+            const closestMatch = possibleMatches[0];
+            if (closestMatch && closestMatch.distance <= 3) {
+                console.log(`Using close match ${closestMatch.name} for predicted filename ${actualFilename}`);
+                actualFilename = closestMatch.name;
+            }
+            else {
+                const availableFilenames = Object.keys(availableFiles).join('\n\t');
+                throw new Error(`Release file ${actualFilename} not found. Closest match is ${closestMatch?.name}. \nFilenames for this version:\n\t${availableFilenames}`);
+            }
         }
-        return this._downloadAndCache(filename, availableFiles[filename].uuid, availableFiles[filename].modified, availableFiles[filename].size, 'r', extract, forceRedownload, version, systemModel, 'release');
+        return this._downloadAndCache(actualFilename, availableFiles[actualFilename].uuid, availableFiles[actualFilename].modified, availableFiles[actualFilename].size, 'r', extract, forceRedownload, version, systemModel, 'release');
     }
     /**
      * Create a dictionary of filenames to file metadata
@@ -1357,6 +1498,178 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], EcoinventProcess.prototype, "getFile", null);
 
+/**
+ * Class for mapping between local and remote processes
+ */
+class ProcessMapping {
+    /**
+     * Create a new ProcessMapping instance
+     *
+     * @param settings Settings object
+     * @param storage Optional CachedStorage object
+     */
+    constructor(settings, storage) {
+        this.settings = settings;
+        this.storage = storage || new CachedStorage();
+    }
+    /**
+     * Create a mapping of remote processes
+     *
+     * @param version Version identifier
+     * @param systemModel System model identifier
+     * @param maxId Maximum process ID to include
+     */
+    async createRemoteMapping(version, systemModel, maxId) {
+        const remoteData = [];
+        const process = new EcoinventProcess(this.settings);
+        await process.setRelease(version, systemModel);
+        for (let index = 1; index <= maxId; index++) {
+            process.datasetId = index.toString();
+            const info = await process.getBasicInfo();
+            remoteData.push(info);
+            // Add a small delay to avoid overwhelming the API
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        return remoteData;
+    }
+    /**
+     * Create a mapping of local processes
+     *
+     * @param key Cache key for the release
+     * @param verbose Whether to log verbose information
+     */
+    createLocalMapping(key, verbose = false) {
+        if (!this.storage.catalogue[key]) {
+            throw new Error(`${key} not in current catalogue. Download the release and retry.`);
+        }
+        const dirPath = path__namespace.join(this.storage.catalogue[key].path, 'datasets');
+        const localData = [];
+        if (typeof window === 'undefined') {
+            // Node.js environment
+            if (!fs__namespace.existsSync(dirPath)) {
+                throw new Error(`Datasets directory not found at ${dirPath}`);
+            }
+            const filePaths = fs__namespace.readdirSync(dirPath)
+                .filter(file => file.toLowerCase().endsWith('.spold'))
+                .map(file => path__namespace.join(dirPath, file));
+            for (const filePath of filePaths) {
+                try {
+                    // Note: We can't use pyecospold in JavaScript, so we'll need to implement
+                    // a simple XML parser for .spold files or use an existing XML parser
+                    // This is a simplified version that just records the file path
+                    localData.push({
+                        path: filePath,
+                        filename: path__namespace.basename(filePath),
+                        // These fields would normally be extracted from the XML
+                        activity_name: 'Unknown (XML parsing not implemented)',
+                        reference_product: 'Unknown (XML parsing not implemented)',
+                        geography: 'Unknown (XML parsing not implemented)',
+                    });
+                    if (verbose) {
+                        console.log(`Processed ${filePath}`);
+                    }
+                }
+                catch (error) {
+                    console.error(`Error processing ${filePath}:`, error);
+                }
+            }
+        }
+        else {
+            // Browser environment - not supported yet
+            console.warn('Local mapping in browser environment is not supported yet');
+        }
+        return localData;
+    }
+}
+
+/**
+ * Log levels
+ */
+exports.LogLevel = void 0;
+(function (LogLevel) {
+    LogLevel[LogLevel["ERROR"] = 0] = "ERROR";
+    LogLevel[LogLevel["WARN"] = 1] = "WARN";
+    LogLevel[LogLevel["INFO"] = 2] = "INFO";
+    LogLevel[LogLevel["DEBUG"] = 3] = "DEBUG";
+})(exports.LogLevel || (exports.LogLevel = {}));
+/**
+ * Global log level setting
+ */
+let globalLogLevel = exports.LogLevel.INFO;
+/**
+ * Set the global log level
+ *
+ * @param level Log level
+ */
+function setLogLevel(level) {
+    globalLogLevel = level;
+}
+/**
+ * Logger class
+ */
+class Logger {
+    /**
+     * Create a new logger
+     *
+     * @param name Logger name
+     */
+    constructor(name) {
+        this.name = name;
+    }
+    /**
+     * Log an error message
+     *
+     * @param message Message to log
+     * @param args Additional arguments
+     */
+    error(message, ...args) {
+        if (globalLogLevel >= exports.LogLevel.ERROR) {
+            console.error(`[ERROR] [${this.name}] ${message}`, ...args);
+        }
+    }
+    /**
+     * Log a warning message
+     *
+     * @param message Message to log
+     * @param args Additional arguments
+     */
+    warn(message, ...args) {
+        if (globalLogLevel >= exports.LogLevel.WARN) {
+            console.warn(`[WARN] [${this.name}] ${message}`, ...args);
+        }
+    }
+    /**
+     * Log an info message
+     *
+     * @param message Message to log
+     * @param args Additional arguments
+     */
+    info(message, ...args) {
+        if (globalLogLevel >= exports.LogLevel.INFO) {
+            console.info(`[INFO] [${this.name}] ${message}`, ...args);
+        }
+    }
+    /**
+     * Log a debug message
+     *
+     * @param message Message to log
+     * @param args Additional arguments
+     */
+    debug(message, ...args) {
+        if (globalLogLevel >= exports.LogLevel.DEBUG) {
+            console.debug(`[DEBUG] [${this.name}] ${message}`, ...args);
+        }
+    }
+}
+/**
+ * Get a logger for a specific name
+ *
+ * @param name Logger name
+ */
+function getLogger(name) {
+    return new Logger(name);
+}
+
 // Main entry point for the ecoinvent-interface package
 // Export types
 // Package version
@@ -1366,10 +1679,14 @@ exports.CachedStorage = CachedStorage;
 exports.EcoinventProcess = EcoinventProcess;
 exports.EcoinventRelease = EcoinventRelease;
 exports.InterfaceBase = InterfaceBase;
+exports.Logger = Logger;
+exports.ProcessMapping = ProcessMapping;
 exports.SYSTEM_MODELS = SYSTEM_MODELS;
 exports.SYSTEM_MODELS_REVERSE = SYSTEM_MODELS_REVERSE;
 exports.Settings = Settings;
 exports.URLS = URLS;
 exports.VERSION = VERSION;
+exports.getLogger = getLogger;
 exports.permanentSetting = permanentSetting;
+exports.setLogLevel = setLogLevel;
 //# sourceMappingURL=index.js.map

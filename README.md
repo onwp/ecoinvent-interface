@@ -142,6 +142,47 @@ console.log(releasePath);
 // '/path/to/cache/universal_matrix_export_3.7.1_apos'
 ```
 
+## Process Mapping
+
+The library provides a `ProcessMapping` class for mapping between local and remote processes:
+
+```javascript
+import { Settings, ProcessMapping } from 'ecoinvent-interface';
+
+const settings = new Settings({
+  username: 'your-username',
+  password: 'your-password',
+});
+
+const mapping = new ProcessMapping(settings);
+
+// Create a mapping of remote processes
+const remoteMapping = await mapping.createRemoteMapping('3.9.1', 'cutoff', 100);
+
+// Create a mapping of local processes
+const localMapping = mapping.createLocalMapping('ecoinvent 3.9.1_cutoff_ecoSpold02.7z');
+```
+
+## Logging
+
+The library provides a logging system with different log levels:
+
+```javascript
+import { LogLevel, setLogLevel, getLogger } from 'ecoinvent-interface';
+
+// Set the global log level
+setLogLevel(LogLevel.DEBUG);
+
+// Get a logger for a specific component
+const logger = getLogger('MyComponent');
+
+// Log messages at different levels
+logger.error('This is an error message');
+logger.warn('This is a warning message');
+logger.info('This is an info message');
+logger.debug('This is a debug message');
+```
+
 ## Browser Support
 
 This library works in both Node.js and browser environments. In browser environments, files are stored in IndexedDB or localStorage, depending on the browser's capabilities.
@@ -162,11 +203,11 @@ function EcoinventLogin() {
   const handleLogin = async () => {
     setLoading(true);
     setError('');
-    
+
     try {
       const settings = new Settings({ username, password });
       const ei = new EcoinventRelease(settings);
-      
+
       await ei.login();
       const versionList = await ei.listVersions();
       setVersions(versionList);
@@ -180,9 +221,9 @@ function EcoinventLogin() {
   return (
     <div>
       <h1>Ecoinvent Login</h1>
-      
+
       {error && <div className="error">{error}</div>}
-      
+
       <div>
         <label>
           Username:
@@ -193,7 +234,7 @@ function EcoinventLogin() {
           />
         </label>
       </div>
-      
+
       <div>
         <label>
           Password:
@@ -204,11 +245,11 @@ function EcoinventLogin() {
           />
         </label>
       </div>
-      
+
       <button onClick={handleLogin} disabled={loading}>
         {loading ? 'Logging in...' : 'Login'}
       </button>
-      
+
       {versions.length > 0 && (
         <div>
           <h2>Available Versions</h2>
