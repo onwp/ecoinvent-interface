@@ -13,5 +13,6 @@ export default {
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^env-paths$': '<rootDir>/__mocks__/env-paths.js',
   },
 };

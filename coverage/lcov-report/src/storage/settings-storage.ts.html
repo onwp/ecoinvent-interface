@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">64.51% </span>
+                <span class="strong">60% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>20/31</span>
+                <span class='fraction'>18/30</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">16.66% </span>
+                <span class="strong">23.07% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>2/12</span>
+                <span class='fraction'>3/13</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">64.51% </span>
+                <span class="strong">60% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>20/31</span>
+                <span class='fraction'>18/30</span>
             </div>
         
             
@@ -143,7 +143,10 @@
 <a name='L78'></a><a href='#L78'>78</a>
 <a name='L79'></a><a href='#L79'>79</a>
 <a name='L80'></a><a href='#L80'>80</a>
-<a name='L81'></a><a href='#L81'>81</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
@@ -166,16 +169,19 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">18x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">18x</span>
 <span class="cline-any cline-yes">18x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">18x</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">18x</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">18x</span>
@@ -223,10 +229,10 @@
 <span class="cline-any cline-yes">18x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { get, set } from 'idb-keyval';
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { get, set } from 'idb-keyval'; // Used in browser environments
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
+import envPaths from 'env-paths';
 &nbsp;
 // Constants
 const STORAGE_PREFIX = 'ecoinvent_interface_';
@@ -245,25 +251,28 @@ function getSecretsDir(): string {
   <span class="missing-if-branch" title="if path not taken" >I</span>if (isBrowser()) {
 <span class="cstat-no" title="statement not covered" >    throw new Error('Secrets directory is not available in browser environment');</span>
   }
-  
-  const homeDir = os.homedir();
-  const appDir = path.join(homeDir, '.ecoinvent-interface');
-  const secretsDir = path.join(appDir, 'secrets');
-  
-  // Create directories if they don't exist
-  <span class="missing-if-branch" title="if path not taken" >I</span>if (!fs.existsSync(appDir)) {
-<span class="cstat-no" title="statement not covered" >    fs.mkdirSync(appDir, { recursive: true });</span>
+&nbsp;
+  // Use env-paths to get platform-specific paths
+  const paths = envPaths('ecoinvent-interface', { suffix: '' });
+  const secretsDir = path.join(paths.config, 'secrets');
+&nbsp;
+  // Create directory if it doesn't exist
+  // Skip directory creation in test environment
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (process.env.NODE_ENV !== 'test' &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >!fs.existsSync(secretsDir))</span> {
+<span class="cstat-no" title="statement not covered" >    try {</span>
+<span class="cstat-no" title="statement not covered" >      fs.mkdirSync(secretsDir, { recursive: true });</span>
+    } catch (error: any) {
+      // In test environment, we might not have permission to create directories
+<span class="cstat-no" title="statement not covered" >      console.warn(`Could not create secrets directory: ${error.message}`);</span>
+    }
   }
-  <span class="missing-if-branch" title="if path not taken" >I</span>if (!fs.existsSync(secretsDir)) {
-<span class="cstat-no" title="statement not covered" >    fs.mkdirSync(secretsDir, { recursive: true });</span>
-  }
-  
+&nbsp;
   return secretsDir;
 }
 &nbsp;
 /**
  * Store a setting permanently
- * 
+ *
  * @param key Setting key
  * @param value Setting value
  */
@@ -281,7 +290,7 @@ export function <span class="fstat-no" title="function not covered" >storeSettin
 &nbsp;
 /**
  * Get a stored setting
- * 
+ *
  * @param key Setting key
  * @returns Setting value or undefined if not found
  */
@@ -310,7 +319,7 @@ export function getStoredSetting(key: string): string | undefined {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-04-10T23:59:52.251Z
+                at 2025-04-11T00:34:37.028Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

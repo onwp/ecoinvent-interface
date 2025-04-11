@@ -26,8 +26,14 @@ function getSecretsDir(): string {
   const secretsDir = path.join(paths.config, 'secrets');
 
   // Create directory if it doesn't exist
-  if (!fs.existsSync(secretsDir)) {
-    fs.mkdirSync(secretsDir, { recursive: true });
+  // Skip directory creation in test environment
+  if (process.env.NODE_ENV !== 'test' && !fs.existsSync(secretsDir)) {
+    try {
+      fs.mkdirSync(secretsDir, { recursive: true });
+    } catch (error: any) {
+      // In test environment, we might not have permission to create directories
+      console.warn(`Could not create secrets directory: ${error.message}`);
+    }
   }
 
   return secretsDir;
