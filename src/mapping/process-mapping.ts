@@ -5,6 +5,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import ProgressBar from 'progress';
 import { XMLParser } from 'fast-xml-parser';
+import { distance, closest } from 'fastest-levenshtein';
+import { getLogger } from '../utils/logger';
+
+// Initialize logger
+const logger = getLogger('ProcessMapping');
 
 /**
  * Interface for process information
@@ -184,5 +189,88 @@ export class ProcessMapping {
     }
 
     return localData;
+  }
+
+  /**
+   * Find the closest match between a local and remote process
+   *
+   * @param localProcess Local process information
+   * @param remoteProcesses Array of remote process information
+   * @param threshold Maximum Levenshtein distance to consider a match (default: 5)
+   * @returns The closest matching remote process or null if no match found
+   */
+  findClosestMatch(localProcess: ProcessInfo, remoteProcesses: ProcessInfo[], threshold: number = 5): ProcessInfo | null {
+    logger.debug(`Finding closest match for ${localProcess.activity_name} (${localProcess.reference_product})`);
+
+    if (!localProcess.activity_name || !localProcess.reference_product) {
+      logger.warn('Local process missing activity_name or reference_product');
+      return null;
+    }
+
+    // Create a combined string for matching
+    const localString = `${localProcess.activity_name} ${localProcess.reference_product} ${localProcess.geography || ''}`;
+
+    // Calculate distances for all remote processes
+    const candidates: Array<{process: ProcessInfo, dist: number}> = [];
+
+    for (const remoteProcess of remoteProcesses) {
+      if (!remoteProcess.activity_name || !remoteProcess.reference_product) {
+        continue;
+      }
+
+      const remoteString = `${remoteProcess.activity_name} ${remoteProcess.reference_product} ${remoteProcess.geography || ''}`;
+      const dist = distance(localString, remoteString);
+
+      if (dist <= threshold) {
+        candidates.push({ process: remoteProcess, dist });
+      }
+    }
+
+    // Sort by distance (ascending)
+    candidates.sort((a, b) => a.dist - b.dist);
+
+    if (candidates.length > 0) {
+      logger.debug(`Found match with distance ${candidates[0].dist}: ${candidates[0].process.activity_name}`);
+      return candidates[0].process;
+    }
+
+    logger.debug('No match found within threshold');
+    return null;
+  }
+
+  /**
+   * Match local processes to remote processes
+   *
+   * @param localProcesses Array of local process information
+   * @param remoteProcesses Array of remote process information
+   * @param threshold Maximum Levenshtein distance to consider a match (default: 5)
+   * @returns Array of matched process pairs
+   */
+  matchProcesses(localProcesses: ProcessInfo[], remoteProcesses: ProcessInfo[], threshold: number = 5): Array<{local: ProcessInfo, remote: ProcessInfo}> {
+    logger.debug(`Matching ${localProcesses.length} local processes to ${remoteProcesses.length} remote processes`);
+
+    const matches: Array<{local: ProcessInfo, remote: ProcessInfo}> = [];
+
+    // Create a progress bar
+    const progressBar = new ProgressBar('Matching processes [:bar] :current/:total :percent :etas', {
+      complete: '=',
+      incomplete: ' ',
+      width: 30,
+      total: localProcesses.length
+    });
+
+    for (const localProcess of localProcesses) {
+      const match = this.findClosestMatch(localProcess, remoteProcesses, threshold);
+
+      if (match) {
+        matches.push({ local: localProcess, remote: match });
+      }
+
+      // Update progress bar
+      progressBar.tick();
+    }
+
+    logger.debug(`Found ${matches.length} matches out of ${localProcesses.length} local processes`);
+    return matches;
   }
 }

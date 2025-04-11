@@ -168,6 +168,14 @@ const localMapping = mapping.createLocalMapping('ecoinvent 3.9.1_cutoff_ecoSpold
 // - activity_name: The name of the activity
 // - reference_product: The name of the reference product
 // - geography: The geography code
+
+// Match local processes to remote processes using fuzzy matching
+const matches = mapping.matchProcesses(localMapping, remoteMapping);
+console.log(`Found ${matches.length} matches`);
+
+// Find the closest match for a specific process
+const localProcess = localMapping[0];
+const match = mapping.findClosestMatch(localProcess, remoteMapping, 10); // threshold of 10
 ```
 
 ## Logging

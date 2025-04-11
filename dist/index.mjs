@@ -469,7 +469,7 @@ function getLogger(name) {
 // Define version here to avoid circular dependencies
 const VERSION$2 = '1.0.0';
 // Initialize logger
-const logger$1 = getLogger('InterfaceBase');
+const logger$2 = getLogger('InterfaceBase');
 /**
  * Method decorator factory for methods that require login
  */
@@ -535,21 +535,21 @@ class InterfaceBase {
      */
     constructor(settings, urls, customHeaders) {
         const instanceId = Math.random().toString(36).substring(2, 9);
-        logger$1.debug(`Creating new instance with ID: ${instanceId}`);
+        logger$2.debug(`Creating new instance with ID: ${instanceId}`);
         if (!settings.username) {
-            logger$1.error('Missing username in settings');
+            logger$2.error('Missing username in settings');
             throw new Error('Missing username; see configurations docs');
         }
         this.username = settings.username;
         if (!settings.password) {
-            logger$1.error('Missing password in settings');
+            logger$2.error('Missing password in settings');
             throw new Error('Missing password; see configurations docs');
         }
         this.password = settings.password;
         this.urls = urls || URLS;
         this.customHeaders = customHeaders || {};
         this.storage = new CachedStorage(settings.outputPath);
-        logger$1.info(`Instantiated ecoinvent-interface class:
+        logger$2.info(`Instantiated ecoinvent-interface class:
     Class: ${this.constructor.name}
     Instance ID: ${instanceId}
     Version: ${VERSION$2}
@@ -563,7 +563,7 @@ class InterfaceBase {
      * Log in to the ecoinvent API
      */
     async login() {
-        logger$1.debug(`Logging in with username: ${this.username}`);
+        logger$2.debug(`Logging in with username: ${this.username}`);
         const postData = {
             username: this.username,
             password: this.password,
@@ -572,10 +572,10 @@ class InterfaceBase {
         };
         try {
             await this._getCredentials(postData);
-            logger$1.info(`Successfully logged in as ${this.username}`);
+            logger$2.info(`Successfully logged in as ${this.username}`);
         }
         catch (error) {
-            logger$1.error(`Login failed: ${error instanceof Error ? error.message : String(error)}`);
+            logger$2.error(`Login failed: ${error instanceof Error ? error.message : String(error)}`);
             throw error;
         }
     }
@@ -583,7 +583,7 @@ class InterfaceBase {
      * Refresh the authentication tokens
      */
     async refreshTokens() {
-        logger$1.debug(`Refreshing tokens for user: ${this.username}`);
+        logger$2.debug(`Refreshing tokens for user: ${this.username}`);
         const postData = {
             client_id: 'apollo-ui',
             grant_type: 'refresh_token',
@@ -591,10 +591,10 @@ class InterfaceBase {
         };
         try {
             await this._getCredentials(postData);
-            logger$1.info(`Successfully refreshed tokens for ${this.username}`);
+            logger$2.info(`Successfully refreshed tokens for ${this.username}`);
         }
         catch (error) {
-            logger$1.error(`Token refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+            logger$2.error(`Token refresh failed: ${error instanceof Error ? error.message : String(error)}`);
             throw error;
         }
     }
@@ -605,14 +605,14 @@ class InterfaceBase {
      */
     async _getCredentials(postData) {
         const ssoUrl = this.urls.sso;
-        logger$1.debug(`Getting credentials from SSO URL: ${ssoUrl}`);
+        logger$2.debug(`Getting credentials from SSO URL: ${ssoUrl}`);
         const headers = {
             'ecoinvent-api-client-library': 'ecoinvent-interface-js',
             'ecoinvent-api-client-library-version': VERSION$2,
             ...this.customHeaders,
         };
         try {
-            logger$1.debug('Sending authentication request...');
+            logger$2.debug('Sending authentication request...');
             const response = await axios.post(ssoUrl, postData, {
                 headers,
                 timeout: 20000,
@@ -621,17 +621,17 @@ class InterfaceBase {
             this.lastRefresh = Date.now();
             this.accessToken = tokens.access_token;
             this.refreshToken = tokens.refresh_token;
-            logger$1.debug('Authentication tokens received and stored');
+            logger$2.debug('Authentication tokens received and stored');
         }
         catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                logger$1.error(`Authentication failed with status ${error.response.status}: ${error.response.statusText}`);
+                logger$2.error(`Authentication failed with status ${error.response.status}: ${error.response.statusText}`);
                 if (error.response.data) {
-                    logger$1.error(`Error details: ${JSON.stringify(error.response.data)}`);
+                    logger$2.error(`Error details: ${JSON.stringify(error.response.data)}`);
                 }
             }
             else {
-                logger$1.error(`Authentication failed: ${error instanceof Error ? error.message : String(error)}`);
+                logger$2.error(`Authentication failed: ${error instanceof Error ? error.message : String(error)}`);
             }
             throw error;
         }
@@ -1301,7 +1301,7 @@ class EcoinventRelease extends InterfaceBase {
 // Define version here to avoid circular dependencies
 const VERSION$1 = '1.0.0';
 // Initialize logger
-const logger = getLogger('EcoinventProcess');
+const logger$1 = getLogger('EcoinventProcess');
 /**
  * Custom error class for missing process operations
  */
@@ -1361,7 +1361,7 @@ function selectedProcess() {
             // 'this' refers to the instance when the method is called
             const instance = this;
             if (!instance.datasetId) {
-                logger.error('Attempted to call a method requiring a selected process without calling selectProcess() first');
+                logger$1.error('Attempted to call a method requiring a selected process without calling selectProcess() first');
                 throw new MissingProcessError();
             }
             return originalMethod.apply(this, args);
@@ -1387,7 +1387,7 @@ function splitUrl(url) {
     }
     catch (error) {
         // Handle relative URLs
-        logger.debug(`Parsing relative URL: ${url}`);
+        logger$1.debug(`Parsing relative URL: ${url}`);
         const [path, query] = url.split('?');
         const params = {};
         if (query) {
@@ -1412,21 +1412,21 @@ class EcoinventProcess extends InterfaceBase {
      * @param systemModel System model identifier
      */
     async setRelease(version, systemModel) {
-        logger.debug(`Setting release: version=${version}, systemModel=${systemModel}`);
+        logger$1.debug(`Setting release: version=${version}, systemModel=${systemModel}`);
         const versions = await this.listVersions();
         if (!versions.includes(version)) {
-            logger.error(`Version ${version} not found in available versions: ${versions.join(', ')}`);
+            logger$1.error(`Version ${version} not found in available versions: ${versions.join(', ')}`);
             throw new Error(`Given version ${version} not found`);
         }
         this.version = version;
         const normalizedSystemModel = SYSTEM_MODELS[systemModel] || systemModel;
         const availableSystemModels = await this.listSystemModels(this.version);
         if (!availableSystemModels.includes(normalizedSystemModel)) {
-            logger.error(`System model '${systemModel}' not available in version ${version}. Available models: ${availableSystemModels.join(', ')}`);
+            logger$1.error(`System model '${systemModel}' not available in version ${version}. Available models: ${availableSystemModels.join(', ')}`);
             throw new Error(`Given system model '${systemModel}' not available in ${version}`);
         }
         this.systemModel = normalizedSystemModel;
-        logger.debug(`Release set successfully: version=${version}, systemModel=${normalizedSystemModel}`);
+        logger$1.debug(`Release set successfully: version=${version}, systemModel=${normalizedSystemModel}`);
     }
     /**
      * Select a process to work with
@@ -1434,13 +1434,13 @@ class EcoinventProcess extends InterfaceBase {
      * @param datasetId Dataset ID (defaults to "1")
      */
     selectProcess(datasetId = '1') {
-        logger.debug(`Selecting process with datasetId=${datasetId}`);
+        logger$1.debug(`Selecting process with datasetId=${datasetId}`);
         if (!this.systemModel) {
-            logger.error('Attempted to select a process without setting release first');
+            logger$1.error('Attempted to select a process without setting release first');
             throw new Error('Must call `.setRelease()` first');
         }
         this.datasetId = datasetId;
-        logger.debug(`Process selected: datasetId=${datasetId}, version=${this.version}, systemModel=${this.systemModel}`);
+        logger$1.debug(`Process selected: datasetId=${datasetId}, version=${this.version}, systemModel=${this.systemModel}`);
     }
     /**
      * Make a JSON request to the API
@@ -1448,7 +1448,7 @@ class EcoinventProcess extends InterfaceBase {
      * @param url API URL
      */
     async _jsonRequest(url) {
-        logger.debug(`Making JSON request to URL: ${url}`);
+        logger$1.debug(`Making JSON request to URL: ${url}`);
         const headers = {
             'Authorization': `Bearer ${this.accessToken}`,
             'ecoinvent-api-client-library': 'ecoinvent-interface-js',
@@ -1460,18 +1460,18 @@ class EcoinventProcess extends InterfaceBase {
             version: this.version,
             system_model: this.systemModel,
         };
-        logger.debug(`Request parameters: ${JSON.stringify(params)}`);
+        logger$1.debug(`Request parameters: ${JSON.stringify(params)}`);
         try {
             const response = await axios.get(url, {
                 params,
                 headers,
                 timeout: 20000,
             });
-            logger.debug(`Received response from ${url} with status ${response.status}`);
+            logger$1.debug(`Received response from ${url} with status ${response.status}`);
             return response.data;
         }
         catch (error) {
-            logger.error(`Error making request to ${url}: ${error instanceof Error ? error.message : String(error)}`);
+            logger$1.error(`Error making request to ${url}: ${error instanceof Error ? error.message : String(error)}`);
             throw error;
         }
     }
@@ -1494,11 +1494,11 @@ class EcoinventProcess extends InterfaceBase {
      * @param directory Directory to save the file to
      */
     async getFile(fileType, directory) {
-        logger.debug(`Getting file of type ${fileType} for process ${this.datasetId}`);
+        logger$1.debug(`Getting file of type ${fileType} for process ${this.datasetId}`);
         const fileTypeDisplayName = getProcessFileTypeDisplayName(fileType);
-        logger.debug(`File type display name: ${fileTypeDisplayName}`);
+        logger$1.debug(`File type display name: ${fileTypeDisplayName}`);
         const fileListResponse = await this._jsonRequest(`${this.urls.api}spold/export_file_list`);
-        logger.debug(`Received file list with ${fileListResponse.length} entries`);
+        logger$1.debug(`Received file list with ${fileListResponse.length} entries`);
         const files = fileListResponse.reduce((acc, obj) => {
             acc[obj.name] = obj;
             delete acc[obj.name].name;
@@ -1506,11 +1506,11 @@ class EcoinventProcess extends InterfaceBase {
         }, {});
         if (!files[fileTypeDisplayName]) {
             const available = Object.keys(files);
-            logger.error(`File type ${fileType} (${fileTypeDisplayName}) not found in available options: ${available.join(', ')}`);
+            logger$1.error(`File type ${fileType} (${fileTypeDisplayName}) not found in available options: ${available.join(', ')}`);
             throw new Error(`Can't find ${fileType} in available options: ${available.join(', ')}`);
         }
         const meta = files[fileTypeDisplayName];
-        logger.debug(`Found metadata for file type ${fileType}: ${JSON.stringify(meta)}`);
+        logger$1.debug(`Found metadata for file type ${fileType}: ${JSON.stringify(meta)}`);
         const headers = {
             'Authorization': `Bearer ${this.accessToken}`,
             'ecoinvent-api-client-library': 'ecoinvent-interface-js',
@@ -1519,45 +1519,45 @@ class EcoinventProcess extends InterfaceBase {
         };
         if (meta.type?.toLowerCase() === 'xml') {
             headers['Accept'] = 'text/plain';
-            logger.debug('Setting Accept header to text/plain for XML content');
+            logger$1.debug('Setting Accept header to text/plain for XML content');
         }
         const [url, params] = splitUrl(meta.url);
-        logger.debug(`Split URL: path=${url}, params=${JSON.stringify(params)}`);
+        logger$1.debug(`Split URL: path=${url}, params=${JSON.stringify(params)}`);
         const suffix = meta.type?.toLowerCase() || 'unknown';
         const filename = `ecoinvent-${this.version}-${this.systemModel}-${fileType}-${this.datasetId}.${suffix}`;
-        logger.debug(`Generated filename: ${filename}`);
+        logger$1.debug(`Generated filename: ${filename}`);
         if (fileType === ProcessFileType.UNDEFINED) {
-            logger.debug(`Handling undefined file type with special case`);
+            logger$1.debug(`Handling undefined file type with special case`);
             try {
                 const apiUrl = `${this.urls.api.slice(0, -1)}${url}`;
-                logger.debug(`Requesting S3 link from ${apiUrl}`);
+                logger$1.debug(`Requesting S3 link from ${apiUrl}`);
                 const response = await axios.get(apiUrl, {
                     params,
                     headers,
                     timeout: 20000,
                 });
                 const s3Link = response.data.download_url;
-                logger.debug(`Received S3 download link: ${s3Link}`);
+                logger$1.debug(`Received S3 download link: ${s3Link}`);
                 await this._streamingDownload(s3Link, {}, directory, filename);
-                logger.debug(`File downloaded successfully to ${directory}/${filename}`);
+                logger$1.debug(`File downloaded successfully to ${directory}/${filename}`);
                 return `${directory}/${filename}`;
             }
             catch (error) {
-                logger.error(`Error downloading undefined file type: ${error instanceof Error ? error.message : String(error)}`);
+                logger$1.error(`Error downloading undefined file type: ${error instanceof Error ? error.message : String(error)}`);
                 throw error;
             }
         }
         const isZipped = ZIPPED_FILE_TYPES.includes(fileType);
-        logger.debug(`File is${isZipped ? '' : ' not'} zipped`);
+        logger$1.debug(`File is${isZipped ? '' : ' not'} zipped`);
         try {
             const apiUrl = `${this.urls.api.slice(0, -1)}${url}`;
-            logger.debug(`Downloading file from ${apiUrl}`);
+            logger$1.debug(`Downloading file from ${apiUrl}`);
             await this._streamingDownload(apiUrl, params, directory, filename, headers, isZipped);
-            logger.debug(`File downloaded successfully to ${directory}/${filename}`);
+            logger$1.debug(`File downloaded successfully to ${directory}/${filename}`);
             return `${directory}/${filename}`;
         }
         catch (error) {
-            logger.error(`Error downloading file: ${error instanceof Error ? error.message : String(error)}`);
+            logger$1.error(`Error downloading file: ${error instanceof Error ? error.message : String(error)}`);
             throw error;
         }
     }
@@ -1575,6 +1575,8 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], EcoinventProcess.prototype, "getFile", null);
 
+// Initialize logger
+const logger = getLogger('ProcessMapping');
 /**
  * Class for mapping between local and remote processes
  */
@@ -1714,6 +1716,72 @@ class ProcessMapping {
             console.warn('Local mapping in browser environment is not supported yet');
         }
         return localData;
+    }
+    /**
+     * Find the closest match between a local and remote process
+     *
+     * @param localProcess Local process information
+     * @param remoteProcesses Array of remote process information
+     * @param threshold Maximum Levenshtein distance to consider a match (default: 5)
+     * @returns The closest matching remote process or null if no match found
+     */
+    findClosestMatch(localProcess, remoteProcesses, threshold = 5) {
+        logger.debug(`Finding closest match for ${localProcess.activity_name} (${localProcess.reference_product})`);
+        if (!localProcess.activity_name || !localProcess.reference_product) {
+            logger.warn('Local process missing activity_name or reference_product');
+            return null;
+        }
+        // Create a combined string for matching
+        const localString = `${localProcess.activity_name} ${localProcess.reference_product} ${localProcess.geography || ''}`;
+        // Calculate distances for all remote processes
+        const candidates = [];
+        for (const remoteProcess of remoteProcesses) {
+            if (!remoteProcess.activity_name || !remoteProcess.reference_product) {
+                continue;
+            }
+            const remoteString = `${remoteProcess.activity_name} ${remoteProcess.reference_product} ${remoteProcess.geography || ''}`;
+            const dist = distance(localString, remoteString);
+            if (dist <= threshold) {
+                candidates.push({ process: remoteProcess, dist });
+            }
+        }
+        // Sort by distance (ascending)
+        candidates.sort((a, b) => a.dist - b.dist);
+        if (candidates.length > 0) {
+            logger.debug(`Found match with distance ${candidates[0].dist}: ${candidates[0].process.activity_name}`);
+            return candidates[0].process;
+        }
+        logger.debug('No match found within threshold');
+        return null;
+    }
+    /**
+     * Match local processes to remote processes
+     *
+     * @param localProcesses Array of local process information
+     * @param remoteProcesses Array of remote process information
+     * @param threshold Maximum Levenshtein distance to consider a match (default: 5)
+     * @returns Array of matched process pairs
+     */
+    matchProcesses(localProcesses, remoteProcesses, threshold = 5) {
+        logger.debug(`Matching ${localProcesses.length} local processes to ${remoteProcesses.length} remote processes`);
+        const matches = [];
+        // Create a progress bar
+        const progressBar = new ProgressBar('Matching processes [:bar] :current/:total :percent :etas', {
+            complete: '=',
+            incomplete: ' ',
+            width: 30,
+            total: localProcesses.length
+        });
+        for (const localProcess of localProcesses) {
+            const match = this.findClosestMatch(localProcess, remoteProcesses, threshold);
+            if (match) {
+                matches.push({ local: localProcess, remote: match });
+            }
+            // Update progress bar
+            progressBar.tick();
+        }
+        logger.debug(`Found ${matches.length} matches out of ${localProcesses.length} local processes`);
+        return matches;
     }
 }
 
