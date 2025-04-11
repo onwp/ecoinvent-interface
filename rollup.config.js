@@ -46,6 +46,7 @@ export default defineConfig([
       'progress',
       'fast-xml-parser',
       'fastest-levenshtein',
+      'env-paths',
     ],
   },
   // Type definitions

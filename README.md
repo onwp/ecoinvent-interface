@@ -190,6 +190,24 @@ logger.info('This is an info message');
 logger.debug('This is a debug message');
 ```
 
+## Cache and Storage
+
+The library uses platform-specific directories for caching files and storing settings:
+
+- On macOS: `~/Library/Caches/ecoinvent-interface` for cache and `~/Library/Preferences/ecoinvent-interface` for settings
+- On Windows: `%LOCALAPPDATA%\ecoinvent-interface\Cache` for cache and `%APPDATA%\ecoinvent-interface\Config` for settings
+- On Linux: `~/.cache/ecoinvent-interface` for cache and `~/.config/ecoinvent-interface` for settings
+
+You can specify a custom cache directory when creating a Settings instance:
+
+```javascript
+const settings = new Settings({
+  username: 'your-username',
+  password: 'your-password',
+  outputPath: '/path/to/custom/cache',
+});
+```
+
 ## Browser Support
 
 This library works in both Node.js and browser environments. In browser environments, files are stored in IndexedDB or localStorage, depending on the browser's capabilities.

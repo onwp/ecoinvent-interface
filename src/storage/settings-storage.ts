@@ -1,7 +1,7 @@
 import { get, set } from 'idb-keyval';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
+import envPaths from 'env-paths';
 
 // Constants
 const STORAGE_PREFIX = 'ecoinvent_interface_';
@@ -20,25 +20,22 @@ function getSecretsDir(): string {
   if (isBrowser()) {
     throw new Error('Secrets directory is not available in browser environment');
   }
-  
-  const homeDir = os.homedir();
-  const appDir = path.join(homeDir, '.ecoinvent-interface');
-  const secretsDir = path.join(appDir, 'secrets');
-  
-  // Create directories if they don't exist
-  if (!fs.existsSync(appDir)) {
-    fs.mkdirSync(appDir, { recursive: true });
-  }
+
+  // Use env-paths to get platform-specific paths
+  const paths = envPaths('ecoinvent-interface', { suffix: '' });
+  const secretsDir = path.join(paths.config, 'secrets');
+
+  // Create directory if it doesn't exist
   if (!fs.existsSync(secretsDir)) {
     fs.mkdirSync(secretsDir, { recursive: true });
   }
-  
+
   return secretsDir;
 }
 
 /**
  * Store a setting permanently
- * 
+ *
  * @param key Setting key
  * @param value Setting value
  */
@@ -56,7 +53,7 @@ export function storeSettingPermanently(key: string, value: string): void {
 
 /**
  * Get a stored setting
- * 
+ *
  * @param key Setting key
  * @returns Setting value or undefined if not found
  */
