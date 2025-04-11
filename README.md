@@ -1,6 +1,6 @@
 # ecoinvent-interface
 
-[![GitHub package version](https://img.shields.io/github/package-json/v/onwp/ecoinvent-interface-js)](https://github.com/onwp/ecoinvent-interface-js/packages)
+[![GitHub package version](https://img.shields.io/github/package-json/v/onwp/ecoinvent-interface)](https://github.com/onwp/ecoinvent-interface/packages)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 A JavaScript library for accessing ecoinvent data. This is an **unofficial and unsupported** library.

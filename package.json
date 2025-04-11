@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "JavaScript interface for accessing ecoinvent data",
   "type": "module",
-  "private": true,
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -32,7 +31,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/onwp/ecoinvent-interface-js.git"
+    "url": "git+https://github.com/onwp/ecoinvent-interface.git"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
