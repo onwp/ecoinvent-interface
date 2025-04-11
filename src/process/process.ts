@@ -203,7 +203,15 @@ export class EcoinventProcess extends InterfaceBase {
         timeout: 20000,
       });
 
-      logger.debug(`Received response from ${url} with status ${response.status}`);
+      const message = `Requesting URL.
+    URL: ${url}
+    Class: ${this.constructor.name}
+    Instance ID: ${Math.random().toString(36).substring(2, 9)}
+    Version: ${VERSION}
+    User: ${this.username}
+      `;
+      logger.debug(message);
+
       return response.data;
     } catch (error) {
       logger.error(`Error making request to ${url}: ${error instanceof Error ? error.message : String(error)}`);
