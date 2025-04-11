@@ -353,8 +353,9 @@ declare class ProcessMapping {
      * @param version Version identifier
      * @param systemModel System model identifier
      * @param maxId Maximum process ID to include
+     * @param delayMs Delay in milliseconds between API calls (default: 100)
      */
-    createRemoteMapping(version: string, systemModel: string, maxId: number): Promise<ProcessInfo[]>;
+    createRemoteMapping(version: string, systemModel: string, maxId: number, delayMs?: number): Promise<ProcessInfo[]>;
     /**
      * Create a mapping of local processes
      *

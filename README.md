@@ -156,11 +156,18 @@ const settings = new Settings({
 
 const mapping = new ProcessMapping(settings);
 
-// Create a mapping of remote processes
-const remoteMapping = await mapping.createRemoteMapping('3.9.1', 'cutoff', 100);
+// Create a mapping of remote processes with progress tracking
+// The last parameter is the delay in ms between API calls (default: 100)
+const remoteMapping = await mapping.createRemoteMapping('3.9.1', 'cutoff', 100, 200);
 
-// Create a mapping of local processes
-const localMapping = mapping.createLocalMapping('ecoinvent 3.9.1_cutoff_ecoSpold02.7z');
+// Create a mapping of local processes with progress tracking and XML parsing
+// The second parameter enables verbose logging
+const localMapping = mapping.createLocalMapping('ecoinvent 3.9.1_cutoff_ecoSpold02.7z', true);
+
+// The local mapping includes parsed data from the XML files:
+// - activity_name: The name of the activity
+// - reference_product: The name of the reference product
+// - geography: The geography code
 ```
 
 ## Logging

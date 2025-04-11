@@ -43,6 +43,9 @@ export default defineConfig([
       'extract-zip',
       'jszip',
       'fflate',
+      'progress',
+      'fast-xml-parser',
+      'fastest-levenshtein',
     ],
   },
   // Type definitions
