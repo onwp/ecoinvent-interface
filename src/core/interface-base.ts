@@ -2,9 +2,13 @@ import axios from 'axios';
 import { Settings } from './settings';
 import { CachedStorage } from '../storage/cached-storage';
 import { URLS, FileMetadata } from '../types';
+import { getLogger } from '../utils/logger';
 
 // Define version here to avoid circular dependencies
 const VERSION = '1.0.0';
+
+// Initialize logger
+const logger = getLogger('InterfaceBase');
 
 /**
  * Method decorator factory for methods that require login
@@ -94,12 +98,17 @@ export class InterfaceBase {
     urls?: typeof URLS,
     customHeaders?: Record<string, string>
   ) {
+    const instanceId = Math.random().toString(36).substring(2, 9);
+    logger.debug(`Creating new instance with ID: ${instanceId}`);
+
     if (!settings.username) {
+      logger.error('Missing username in settings');
       throw new Error('Missing username; see configurations docs');
     }
     this.username = settings.username;
 
     if (!settings.password) {
+      logger.error('Missing password in settings');
       throw new Error('Missing password; see configurations docs');
     }
     this.password = settings.password;
@@ -108,9 +117,9 @@ export class InterfaceBase {
     this.customHeaders = customHeaders || {};
     this.storage = new CachedStorage(settings.outputPath);
 
-    console.log(`Instantiated ecoinvent-interface class:
+    logger.info(`Instantiated ecoinvent-interface class:
     Class: ${this.constructor.name}
-    Instance ID: ${Math.random().toString(36).substring(2, 9)}
+    Instance ID: ${instanceId}
     Version: ${VERSION}
     User: ${this.username}
     Output directory: ${this.storage.dir}
@@ -123,6 +132,8 @@ export class InterfaceBase {
    * Log in to the ecoinvent API
    */
   async login(): Promise<void> {
+    logger.debug(`Logging in with username: ${this.username}`);
+
     const postData = {
       username: this.username,
       password: this.password,
@@ -130,12 +141,13 @@ export class InterfaceBase {
       grant_type: 'password',
     };
 
-    await this._getCredentials(postData);
-
-    console.log(`Got initial credentials.
-    Class: ${this.constructor.name}
-    User: ${this.username}
-    `);
+    try {
+      await this._getCredentials(postData);
+      logger.info(`Successfully logged in as ${this.username}`);
+    } catch (error) {
+      logger.error(`Login failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
   }
 
   /**
@@ -143,18 +155,21 @@ export class InterfaceBase {
    */
   @loggedIn()
   async refreshTokens(): Promise<void> {
+    logger.debug(`Refreshing tokens for user: ${this.username}`);
+
     const postData = {
       client_id: 'apollo-ui',
       grant_type: 'refresh_token',
       refresh_token: this.refreshToken,
     };
 
-    await this._getCredentials(postData);
-
-    console.log(`Renewed credentials.
-    Class: ${this.constructor.name}
-    User: ${this.username}
-    `);
+    try {
+      await this._getCredentials(postData);
+      logger.info(`Successfully refreshed tokens for ${this.username}`);
+    } catch (error) {
+      logger.error(`Token refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
   }
 
   /**
@@ -164,6 +179,8 @@ export class InterfaceBase {
    */
   private async _getCredentials(postData: any): Promise<void> {
     const ssoUrl = this.urls.sso;
+    logger.debug(`Getting credentials from SSO URL: ${ssoUrl}`);
+
     const headers = {
       'ecoinvent-api-client-library': 'ecoinvent-interface-js',
       'ecoinvent-api-client-library-version': VERSION,
@@ -171,6 +188,7 @@ export class InterfaceBase {
     };
 
     try {
+      logger.debug('Sending authentication request...');
       const response = await axios.post(ssoUrl, postData, {
         headers,
         timeout: 20000,
@@ -180,8 +198,17 @@ export class InterfaceBase {
       this.lastRefresh = Date.now();
       this.accessToken = tokens.access_token;
       this.refreshToken = tokens.refresh_token;
+
+      logger.debug('Authentication tokens received and stored');
     } catch (error) {
-      console.error('Given credentials can\'t log in:', error);
+      if (axios.isAxiosError(error) && error.response) {
+        logger.error(`Authentication failed with status ${error.response.status}: ${error.response.statusText}`);
+        if (error.response.data) {
+          logger.error(`Error details: ${JSON.stringify(error.response.data)}`);
+        }
+      } else {
+        logger.error(`Authentication failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
       throw error;
     }
   }

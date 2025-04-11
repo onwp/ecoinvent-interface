@@ -1,5 +1,11 @@
 import { InterfaceBase } from '../core/interface-base';
 /**
+ * Custom error class for missing process operations
+ */
+export declare class MissingProcessError extends Error {
+    constructor(message?: string);
+}
+/**
  * Enum for different types of process files
  */
 export declare enum ProcessFileType {

@@ -378,8 +378,98 @@ class CachedStorage {
     }
 }
 
+/**
+ * Log levels
+ */
+var LogLevel;
+(function (LogLevel) {
+    LogLevel[LogLevel["ERROR"] = 0] = "ERROR";
+    LogLevel[LogLevel["WARN"] = 1] = "WARN";
+    LogLevel[LogLevel["INFO"] = 2] = "INFO";
+    LogLevel[LogLevel["DEBUG"] = 3] = "DEBUG";
+})(LogLevel || (LogLevel = {}));
+/**
+ * Global log level setting
+ */
+let globalLogLevel = LogLevel.INFO;
+/**
+ * Set the global log level
+ *
+ * @param level Log level
+ */
+function setLogLevel(level) {
+    globalLogLevel = level;
+}
+/**
+ * Logger class
+ */
+class Logger {
+    /**
+     * Create a new logger
+     *
+     * @param name Logger name
+     */
+    constructor(name) {
+        this.name = name;
+    }
+    /**
+     * Log an error message
+     *
+     * @param message Message to log
+     * @param args Additional arguments
+     */
+    error(message, ...args) {
+        if (globalLogLevel >= LogLevel.ERROR) {
+            console.error(`[ERROR] [${this.name}] ${message}`, ...args);
+        }
+    }
+    /**
+     * Log a warning message
+     *
+     * @param message Message to log
+     * @param args Additional arguments
+     */
+    warn(message, ...args) {
+        if (globalLogLevel >= LogLevel.WARN) {
+            console.warn(`[WARN] [${this.name}] ${message}`, ...args);
+        }
+    }
+    /**
+     * Log an info message
+     *
+     * @param message Message to log
+     * @param args Additional arguments
+     */
+    info(message, ...args) {
+        if (globalLogLevel >= LogLevel.INFO) {
+            console.info(`[INFO] [${this.name}] ${message}`, ...args);
+        }
+    }
+    /**
+     * Log a debug message
+     *
+     * @param message Message to log
+     * @param args Additional arguments
+     */
+    debug(message, ...args) {
+        if (globalLogLevel >= LogLevel.DEBUG) {
+            console.debug(`[DEBUG] [${this.name}] ${message}`, ...args);
+        }
+    }
+}
+/**
+ * Get a logger for a specific name
+ *
+ * @param name Logger name
+ */
+function getLogger(name) {
+    return new Logger(name);
+}
+
 // Define version here to avoid circular dependencies
 const VERSION$2 = '1.0.0';
+// Initialize logger
+const logger$1 = getLogger('InterfaceBase');
 /**
  * Method decorator factory for methods that require login
  */
@@ -444,20 +534,24 @@ class InterfaceBase {
      * @param customHeaders Optional custom HTTP headers
      */
     constructor(settings, urls, customHeaders) {
+        const instanceId = Math.random().toString(36).substring(2, 9);
+        logger$1.debug(`Creating new instance with ID: ${instanceId}`);
         if (!settings.username) {
+            logger$1.error('Missing username in settings');
             throw new Error('Missing username; see configurations docs');
         }
         this.username = settings.username;
         if (!settings.password) {
+            logger$1.error('Missing password in settings');
             throw new Error('Missing password; see configurations docs');
         }
         this.password = settings.password;
         this.urls = urls || URLS;
         this.customHeaders = customHeaders || {};
         this.storage = new CachedStorage(settings.outputPath);
-        console.log(`Instantiated ecoinvent-interface class:
+        logger$1.info(`Instantiated ecoinvent-interface class:
     Class: ${this.constructor.name}
-    Instance ID: ${Math.random().toString(36).substring(2, 9)}
+    Instance ID: ${instanceId}
     Version: ${VERSION$2}
     User: ${this.username}
     Output directory: ${this.storage.dir}
@@ -469,32 +563,40 @@ class InterfaceBase {
      * Log in to the ecoinvent API
      */
     async login() {
+        logger$1.debug(`Logging in with username: ${this.username}`);
         const postData = {
             username: this.username,
             password: this.password,
             client_id: 'apollo-ui',
             grant_type: 'password',
         };
-        await this._getCredentials(postData);
-        console.log(`Got initial credentials.
-    Class: ${this.constructor.name}
-    User: ${this.username}
-    `);
+        try {
+            await this._getCredentials(postData);
+            logger$1.info(`Successfully logged in as ${this.username}`);
+        }
+        catch (error) {
+            logger$1.error(`Login failed: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
     }
     /**
      * Refresh the authentication tokens
      */
     async refreshTokens() {
+        logger$1.debug(`Refreshing tokens for user: ${this.username}`);
         const postData = {
             client_id: 'apollo-ui',
             grant_type: 'refresh_token',
             refresh_token: this.refreshToken,
         };
-        await this._getCredentials(postData);
-        console.log(`Renewed credentials.
-    Class: ${this.constructor.name}
-    User: ${this.username}
-    `);
+        try {
+            await this._getCredentials(postData);
+            logger$1.info(`Successfully refreshed tokens for ${this.username}`);
+        }
+        catch (error) {
+            logger$1.error(`Token refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
     }
     /**
      * Get authentication credentials from the API
@@ -503,12 +605,14 @@ class InterfaceBase {
      */
     async _getCredentials(postData) {
         const ssoUrl = this.urls.sso;
+        logger$1.debug(`Getting credentials from SSO URL: ${ssoUrl}`);
         const headers = {
             'ecoinvent-api-client-library': 'ecoinvent-interface-js',
             'ecoinvent-api-client-library-version': VERSION$2,
             ...this.customHeaders,
         };
         try {
+            logger$1.debug('Sending authentication request...');
             const response = await axios.post(ssoUrl, postData, {
                 headers,
                 timeout: 20000,
@@ -517,9 +621,18 @@ class InterfaceBase {
             this.lastRefresh = Date.now();
             this.accessToken = tokens.access_token;
             this.refreshToken = tokens.refresh_token;
+            logger$1.debug('Authentication tokens received and stored');
         }
         catch (error) {
-            console.error('Given credentials can\'t log in:', error);
+            if (axios.isAxiosError(error) && error.response) {
+                logger$1.error(`Authentication failed with status ${error.response.status}: ${error.response.statusText}`);
+                if (error.response.data) {
+                    logger$1.error(`Error details: ${JSON.stringify(error.response.data)}`);
+                }
+            }
+            else {
+                logger$1.error(`Authentication failed: ${error instanceof Error ? error.message : String(error)}`);
+            }
             throw error;
         }
     }
@@ -1187,6 +1300,19 @@ class EcoinventRelease extends InterfaceBase {
 
 // Define version here to avoid circular dependencies
 const VERSION$1 = '1.0.0';
+// Initialize logger
+const logger = getLogger('EcoinventProcess');
+/**
+ * Custom error class for missing process operations
+ */
+class MissingProcessError extends Error {
+    constructor(message = 'Must call `.selectProcess()` first') {
+        super(message);
+        this.name = 'MissingProcessError';
+        // This is needed to make instanceof work correctly in TypeScript
+        Object.setPrototypeOf(this, MissingProcessError.prototype);
+    }
+}
 /**
  * Enum for different types of process files
  */
@@ -1235,7 +1361,8 @@ function selectedProcess() {
             // 'this' refers to the instance when the method is called
             const instance = this;
             if (!instance.datasetId) {
-                throw new Error('Must call `.selectProcess()` first');
+                logger.error('Attempted to call a method requiring a selected process without calling selectProcess() first');
+                throw new MissingProcessError();
             }
             return originalMethod.apply(this, args);
         };
@@ -1244,16 +1371,35 @@ function selectedProcess() {
 }
 /**
  * Split a URL with parameters into a base path and a parameters object
+ * This is a more robust implementation that handles relative URLs
  *
  * @param url URL to split
  */
 function splitUrl(url) {
-    const urlObj = new URL(url);
-    const params = {};
-    urlObj.searchParams.forEach((value, key) => {
-        params[key] = value;
-    });
-    return [urlObj.pathname, params];
+    try {
+        // Try to parse as a full URL
+        const urlObj = new URL(url);
+        const params = {};
+        urlObj.searchParams.forEach((value, key) => {
+            params[key] = value;
+        });
+        return [urlObj.pathname, params];
+    }
+    catch (error) {
+        // Handle relative URLs
+        logger.debug(`Parsing relative URL: ${url}`);
+        const [path, query] = url.split('?');
+        const params = {};
+        if (query) {
+            query.split('&').forEach(param => {
+                const [key, value] = param.split('=');
+                if (key) {
+                    params[key] = value || '';
+                }
+            });
+        }
+        return [path, params];
+    }
 }
 /**
  * Class for interacting with ecoinvent processes
@@ -1266,17 +1412,21 @@ class EcoinventProcess extends InterfaceBase {
      * @param systemModel System model identifier
      */
     async setRelease(version, systemModel) {
+        logger.debug(`Setting release: version=${version}, systemModel=${systemModel}`);
         const versions = await this.listVersions();
         if (!versions.includes(version)) {
+            logger.error(`Version ${version} not found in available versions: ${versions.join(', ')}`);
             throw new Error(`Given version ${version} not found`);
         }
         this.version = version;
         const normalizedSystemModel = SYSTEM_MODELS[systemModel] || systemModel;
         const availableSystemModels = await this.listSystemModels(this.version);
         if (!availableSystemModels.includes(normalizedSystemModel)) {
+            logger.error(`System model '${systemModel}' not available in version ${version}. Available models: ${availableSystemModels.join(', ')}`);
             throw new Error(`Given system model '${systemModel}' not available in ${version}`);
         }
         this.systemModel = normalizedSystemModel;
+        logger.debug(`Release set successfully: version=${version}, systemModel=${normalizedSystemModel}`);
     }
     /**
      * Select a process to work with
@@ -1284,10 +1434,13 @@ class EcoinventProcess extends InterfaceBase {
      * @param datasetId Dataset ID (defaults to "1")
      */
     selectProcess(datasetId = '1') {
+        logger.debug(`Selecting process with datasetId=${datasetId}`);
         if (!this.systemModel) {
+            logger.error('Attempted to select a process without setting release first');
             throw new Error('Must call `.setRelease()` first');
         }
         this.datasetId = datasetId;
+        logger.debug(`Process selected: datasetId=${datasetId}, version=${this.version}, systemModel=${this.systemModel}`);
     }
     /**
      * Make a JSON request to the API
@@ -1295,23 +1448,32 @@ class EcoinventProcess extends InterfaceBase {
      * @param url API URL
      */
     async _jsonRequest(url) {
+        logger.debug(`Making JSON request to URL: ${url}`);
         const headers = {
             'Authorization': `Bearer ${this.accessToken}`,
             'ecoinvent-api-client-library': 'ecoinvent-interface-js',
             'ecoinvent-api-client-library-version': VERSION$1,
             ...this.customHeaders,
         };
-        const response = await axios.get(url, {
-            params: {
-                dataset_id: this.datasetId,
-                version: this.version,
-                system_model: this.systemModel,
-            },
-            headers,
-            timeout: 20000,
-        });
-        console.log(`Requesting URL: ${url}`);
-        return response.data;
+        const params = {
+            dataset_id: this.datasetId,
+            version: this.version,
+            system_model: this.systemModel,
+        };
+        logger.debug(`Request parameters: ${JSON.stringify(params)}`);
+        try {
+            const response = await axios.get(url, {
+                params,
+                headers,
+                timeout: 20000,
+            });
+            logger.debug(`Received response from ${url} with status ${response.status}`);
+            return response.data;
+        }
+        catch (error) {
+            logger.error(`Error making request to ${url}: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
     }
     /**
      * Get basic information about the selected process
@@ -1332,8 +1494,11 @@ class EcoinventProcess extends InterfaceBase {
      * @param directory Directory to save the file to
      */
     async getFile(fileType, directory) {
+        logger.debug(`Getting file of type ${fileType} for process ${this.datasetId}`);
         const fileTypeDisplayName = getProcessFileTypeDisplayName(fileType);
+        logger.debug(`File type display name: ${fileTypeDisplayName}`);
         const fileListResponse = await this._jsonRequest(`${this.urls.api}spold/export_file_list`);
+        logger.debug(`Received file list with ${fileListResponse.length} entries`);
         const files = fileListResponse.reduce((acc, obj) => {
             acc[obj.name] = obj;
             delete acc[obj.name].name;
@@ -1341,9 +1506,11 @@ class EcoinventProcess extends InterfaceBase {
         }, {});
         if (!files[fileTypeDisplayName]) {
             const available = Object.keys(files);
+            logger.error(`File type ${fileType} (${fileTypeDisplayName}) not found in available options: ${available.join(', ')}`);
             throw new Error(`Can't find ${fileType} in available options: ${available.join(', ')}`);
         }
         const meta = files[fileTypeDisplayName];
+        logger.debug(`Found metadata for file type ${fileType}: ${JSON.stringify(meta)}`);
         const headers = {
             'Authorization': `Bearer ${this.accessToken}`,
             'ecoinvent-api-client-library': 'ecoinvent-interface-js',
@@ -1352,22 +1519,47 @@ class EcoinventProcess extends InterfaceBase {
         };
         if (meta.type?.toLowerCase() === 'xml') {
             headers['Accept'] = 'text/plain';
+            logger.debug('Setting Accept header to text/plain for XML content');
         }
         const [url, params] = splitUrl(meta.url);
+        logger.debug(`Split URL: path=${url}, params=${JSON.stringify(params)}`);
         const suffix = meta.type?.toLowerCase() || 'unknown';
         const filename = `ecoinvent-${this.version}-${this.systemModel}-${fileType}-${this.datasetId}.${suffix}`;
+        logger.debug(`Generated filename: ${filename}`);
         if (fileType === ProcessFileType.UNDEFINED) {
-            const response = await axios.get(`${this.urls.api.slice(0, -1)}${url}`, {
-                params,
-                headers,
-                timeout: 20000,
-            });
-            const s3Link = response.data.download_url;
-            await this._streamingDownload(s3Link, {}, directory, filename);
+            logger.debug(`Handling undefined file type with special case`);
+            try {
+                const apiUrl = `${this.urls.api.slice(0, -1)}${url}`;
+                logger.debug(`Requesting S3 link from ${apiUrl}`);
+                const response = await axios.get(apiUrl, {
+                    params,
+                    headers,
+                    timeout: 20000,
+                });
+                const s3Link = response.data.download_url;
+                logger.debug(`Received S3 download link: ${s3Link}`);
+                await this._streamingDownload(s3Link, {}, directory, filename);
+                logger.debug(`File downloaded successfully to ${directory}/${filename}`);
+                return `${directory}/${filename}`;
+            }
+            catch (error) {
+                logger.error(`Error downloading undefined file type: ${error instanceof Error ? error.message : String(error)}`);
+                throw error;
+            }
+        }
+        const isZipped = ZIPPED_FILE_TYPES.includes(fileType);
+        logger.debug(`File is${isZipped ? '' : ' not'} zipped`);
+        try {
+            const apiUrl = `${this.urls.api.slice(0, -1)}${url}`;
+            logger.debug(`Downloading file from ${apiUrl}`);
+            await this._streamingDownload(apiUrl, params, directory, filename, headers, isZipped);
+            logger.debug(`File downloaded successfully to ${directory}/${filename}`);
             return `${directory}/${filename}`;
         }
-        await this._streamingDownload(`${this.urls.api.slice(0, -1)}${url}`, params, directory, filename, headers, ZIPPED_FILE_TYPES.includes(fileType));
-        return `${directory}/${filename}`;
+        catch (error) {
+            logger.error(`Error downloading file: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
     }
 }
 __decorate([
@@ -1523,94 +1715,6 @@ class ProcessMapping {
         }
         return localData;
     }
-}
-
-/**
- * Log levels
- */
-var LogLevel;
-(function (LogLevel) {
-    LogLevel[LogLevel["ERROR"] = 0] = "ERROR";
-    LogLevel[LogLevel["WARN"] = 1] = "WARN";
-    LogLevel[LogLevel["INFO"] = 2] = "INFO";
-    LogLevel[LogLevel["DEBUG"] = 3] = "DEBUG";
-})(LogLevel || (LogLevel = {}));
-/**
- * Global log level setting
- */
-let globalLogLevel = LogLevel.INFO;
-/**
- * Set the global log level
- *
- * @param level Log level
- */
-function setLogLevel(level) {
-    globalLogLevel = level;
-}
-/**
- * Logger class
- */
-class Logger {
-    /**
-     * Create a new logger
-     *
-     * @param name Logger name
-     */
-    constructor(name) {
-        this.name = name;
-    }
-    /**
-     * Log an error message
-     *
-     * @param message Message to log
-     * @param args Additional arguments
-     */
-    error(message, ...args) {
-        if (globalLogLevel >= LogLevel.ERROR) {
-            console.error(`[ERROR] [${this.name}] ${message}`, ...args);
-        }
-    }
-    /**
-     * Log a warning message
-     *
-     * @param message Message to log
-     * @param args Additional arguments
-     */
-    warn(message, ...args) {
-        if (globalLogLevel >= LogLevel.WARN) {
-            console.warn(`[WARN] [${this.name}] ${message}`, ...args);
-        }
-    }
-    /**
-     * Log an info message
-     *
-     * @param message Message to log
-     * @param args Additional arguments
-     */
-    info(message, ...args) {
-        if (globalLogLevel >= LogLevel.INFO) {
-            console.info(`[INFO] [${this.name}] ${message}`, ...args);
-        }
-    }
-    /**
-     * Log a debug message
-     *
-     * @param message Message to log
-     * @param args Additional arguments
-     */
-    debug(message, ...args) {
-        if (globalLogLevel >= LogLevel.DEBUG) {
-            console.debug(`[DEBUG] [${this.name}] ${message}`, ...args);
-        }
-    }
-}
-/**
- * Get a logger for a specific name
- *
- * @param name Logger name
- */
-function getLogger(name) {
-    return new Logger(name);
 }
 
 // Main entry point for the ecoinvent-interface package
