@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1744337049270" clover="3.2.0">
-  <project timestamp="1744337049270" name="All files">
+<coverage generated="1744377478875" clover="3.2.0">
+  <project timestamp="1744377478875" name="All files">
     <metrics statements="706" coveredstatements="204" conditionals="229" coveredconditionals="52" methods="137" coveredmethods="43" elements="1072" coveredelements="299" complexity="0" loc="706" ncloc="706" packages="8" files="10" classes="10"/>
     <package name="src">
       <metrics statements="1" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
-      <file name="index.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface-js/src/index.ts">
+      <file name="index.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface/src/index.ts">
         <metrics statements="1" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
         <line num="26" count="0" type="stmt"/>
       </file>
     </package>
     <package name="src.core">
       <metrics statements="161" coveredstatements="112" conditionals="55" coveredconditionals="28" methods="26" coveredmethods="19"/>
-      <file name="interface-base.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface-js/src/core/interface-base.ts">
+      <file name="interface-base.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface/src/core/interface-base.ts">
         <metrics statements="139" coveredstatements="93" conditionals="39" coveredconditionals="13" methods="24" coveredmethods="18"/>
         <line num="1" count="2" type="stmt"/>
         <line num="3" count="2" type="stmt"/>
@@ -153,7 +153,7 @@
         <line num="427" count="0" type="stmt"/>
         <line num="430" count="0" type="stmt"/>
       </file>
-      <file name="settings.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface-js/src/core/settings.ts">
+      <file name="settings.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface/src/core/settings.ts">
         <metrics statements="22" coveredstatements="19" conditionals="16" coveredconditionals="15" methods="2" coveredmethods="1"/>
         <line num="2" count="3" type="stmt"/>
         <line num="13" count="3" type="stmt"/>
@@ -181,7 +181,7 @@
     </package>
     <package name="src.mapping">
       <metrics statements="81" coveredstatements="0" conditionals="31" coveredconditionals="0" methods="10" coveredmethods="0"/>
-      <file name="process-mapping.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface-js/src/mapping/process-mapping.ts">
+      <file name="process-mapping.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface/src/mapping/process-mapping.ts">
         <metrics statements="81" coveredstatements="0" conditionals="31" coveredconditionals="0" methods="10" coveredmethods="0"/>
         <line num="12" count="0" type="stmt"/>
         <line num="40" count="0" type="stmt"/>
@@ -268,7 +268,7 @@
     </package>
     <package name="src.process">
       <metrics statements="124" coveredstatements="0" conditionals="33" coveredconditionals="0" methods="16" coveredmethods="0"/>
-      <file name="process.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface-js/src/process/process.ts">
+      <file name="process.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface/src/process/process.ts">
         <metrics statements="124" coveredstatements="0" conditionals="33" coveredconditionals="0" methods="16" coveredmethods="0"/>
         <line num="7" count="0" type="stmt"/>
         <line num="10" count="0" type="stmt"/>
@@ -398,7 +398,7 @@
     </package>
     <package name="src.release">
       <metrics statements="173" coveredstatements="52" conditionals="55" coveredconditionals="17" methods="27" coveredmethods="14"/>
-      <file name="release.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface-js/src/release/release.ts">
+      <file name="release.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface/src/release/release.ts">
         <metrics statements="173" coveredstatements="52" conditionals="55" coveredconditionals="17" methods="27" coveredmethods="14"/>
         <line num="1" count="1" type="stmt"/>
         <line num="2" count="1" type="stmt"/>
@@ -577,7 +577,7 @@
     </package>
     <package name="src.storage">
       <metrics statements="139" coveredstatements="18" conditionals="49" coveredconditionals="3" methods="48" coveredmethods="3"/>
-      <file name="cached-storage.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface-js/src/storage/cached-storage.ts">
+      <file name="cached-storage.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface/src/storage/cached-storage.ts">
         <metrics statements="109" coveredstatements="0" conditionals="36" coveredconditionals="0" methods="44" coveredmethods="0"/>
         <line num="10" count="0" type="stmt"/>
         <line num="16" count="0" type="cond" truecount="0" falsecount="2"/>
@@ -689,7 +689,7 @@
         <line num="447" count="0" type="stmt"/>
         <line num="448" count="0" type="stmt"/>
       </file>
-      <file name="settings-storage.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface-js/src/storage/settings-storage.ts">
+      <file name="settings-storage.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface/src/storage/settings-storage.ts">
         <metrics statements="30" coveredstatements="18" conditionals="13" coveredconditionals="3" methods="4" coveredmethods="3"/>
         <line num="2" count="2" type="stmt"/>
         <line num="3" count="2" type="stmt"/>
@@ -725,7 +725,7 @@
     </package>
     <package name="src.types">
       <metrics statements="5" coveredstatements="5" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
-      <file name="index.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface-js/src/types/index.ts">
+      <file name="index.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface/src/types/index.ts">
         <metrics statements="5" coveredstatements="5" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
         <line num="11" count="2" type="stmt"/>
         <line num="18" count="2" type="stmt"/>
@@ -736,7 +736,7 @@
     </package>
     <package name="src.utils">
       <metrics statements="22" coveredstatements="17" conditionals="6" coveredconditionals="4" methods="9" coveredmethods="6"/>
-      <file name="logger.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface-js/src/utils/logger.ts">
+      <file name="logger.ts" path="/Users/sero/Downloads/ecoinvent_interface-2.0.dev1/ecoinvent-interface/src/utils/logger.ts">
         <metrics statements="22" coveredstatements="17" conditionals="6" coveredconditionals="4" methods="9" coveredmethods="6"/>
         <line num="4" count="2" type="cond" truecount="2" falsecount="0"/>
         <line num="5" count="2" type="stmt"/>
