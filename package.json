@@ -33,6 +33,10 @@
     "type": "git",
     "url": "git+https://github.com/onwp/ecoinvent-interface.git"
   },
+  "homepage": "https://github.com/onwp/ecoinvent-interface",
+  "bugs": {
+    "url": "https://github.com/onwp/ecoinvent-interface/issues"
+  },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
