@@ -17,6 +17,15 @@ export enum ProcessFileType {
 }
 
 /**
+ * File types that are zipped
+ */
+const ZIPPED_FILE_TYPES = [
+  ProcessFileType.UPR,
+  ProcessFileType.LCI,
+  ProcessFileType.LCIA,
+];
+
+/**
  * Get the display name for a process file type
  */
 function getProcessFileTypeDisplayName(type: ProcessFileType): string {
@@ -122,7 +131,7 @@ export class EcoinventProcess extends InterfaceBase {
    */
   @selectedProcess()
   async _jsonRequest(url: string): Promise<any> {
-    const headers = {
+    const headers: Record<string, string> = {
       'Authorization': `Bearer ${this.accessToken}`,
       'ecoinvent-api-client-library': 'ecoinvent-interface-js',
       'ecoinvent-api-client-library-version': VERSION,
@@ -214,7 +223,8 @@ export class EcoinventProcess extends InterfaceBase {
       params,
       directory,
       filename,
-      headers
+      headers,
+      ZIPPED_FILE_TYPES.includes(fileType)
     );
 
     return `${directory}/${filename}`;

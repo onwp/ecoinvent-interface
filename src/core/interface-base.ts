@@ -331,9 +331,22 @@ export class InterfaceBase {
       }
     } else {
       // Browser environment
-      // In a real implementation, this would use the Fetch API and handle the file
-      // in a way appropriate for browsers (e.g., download or save to IndexedDB)
-      throw new Error('Streaming downloads in browser environment not implemented yet');
+      console.log(`Browser download requested for ${url}`);
+
+      // For browser environments, we'll use a simpler approach
+      // that doesn't require modifying the CachedStorage interface
+      const downloadUrl = new URL(url);
+      Object.entries(params).forEach(([key, value]) => {
+        downloadUrl.searchParams.append(key, value);
+      });
+
+      // Open the download in a new tab
+      window.open(downloadUrl.toString(), '_blank');
+
+      console.log(`Initiated browser download for ${filename}`);
+
+      // Return a placeholder path
+      return;
     }
   }
 
