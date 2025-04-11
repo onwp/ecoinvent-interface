@@ -1,14 +1,27 @@
 # ecoinvent-interface
 
-[![npm version](https://img.shields.io/npm/v/ecoinvent-interface.svg)](https://www.npmjs.com/package/ecoinvent-interface)
+[![GitHub package version](https://img.shields.io/github/package-json/v/onwp/ecoinvent-interface-js)](https://github.com/onwp/ecoinvent-interface-js/packages)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 A JavaScript library for accessing ecoinvent data. This is an **unofficial and unsupported** library.
 
 ## Installation
 
+This package is published to GitHub Packages. To install it, you'll need to configure npm to use GitHub Packages for the `@onwp` scope.
+
+1. Create or edit a `.npmrc` file in your project root:
+
+```
+@onwp:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+```
+
+2. Set the `GITHUB_TOKEN` environment variable with a personal access token that has the `read:packages` scope.
+
+3. Install the package:
+
 ```bash
-npm install ecoinvent-interface
+npm install @onwp/ecoinvent-interface
 ```
 
 ## Usage
@@ -24,7 +37,7 @@ You can provide credentials in three ways:
 * Manually, via arguments to the `Settings` object instantiation:
 
 ```javascript
-import { Settings } from 'ecoinvent-interface';
+import { Settings } from '@onwp/ecoinvent-interface';
 const settings = new Settings({
   username: 'bob',
   password: 'example'
@@ -39,7 +52,7 @@ export EI_PASSWORD=example
 ```
 
 ```javascript
-import { Settings } from 'ecoinvent-interface';
+import { Settings } from '@onwp/ecoinvent-interface';
 // Environment variables read automatically
 const settings = new Settings();
 ```
@@ -47,7 +60,7 @@ const settings = new Settings();
 * Via stored settings:
 
 ```javascript
-import { Settings, permanentSetting } from 'ecoinvent-interface';
+import { Settings, permanentSetting } from '@onwp/ecoinvent-interface';
 permanentSetting('username', 'bob');
 permanentSetting('password', 'example');
 // Stored settings read automatically
@@ -61,7 +74,7 @@ For each value, manually set values always take precedence over environment vari
 To interact with the ecoinvent website, instantiate `EcoinventRelease`. You can specify your credentials manually when creating the class instance, or with the approaches outlined above.
 
 ```javascript
-import { EcoinventRelease } from 'ecoinvent-interface';
+import { EcoinventRelease } from '@onwp/ecoinvent-interface';
 const ei = new EcoinventRelease(settings);
 ```
 
@@ -135,7 +148,7 @@ console.log(reportPath);
 You can download release files for a specific version and system model:
 
 ```javascript
-import { ReleaseType } from 'ecoinvent-interface';
+import { ReleaseType } from '@onwp/ecoinvent-interface';
 
 const releasePath = await ei.getRelease('3.7.1', 'apos', ReleaseType.MATRIX);
 console.log(releasePath);
@@ -147,7 +160,7 @@ console.log(releasePath);
 The library provides a `ProcessMapping` class for mapping between local and remote processes:
 
 ```javascript
-import { Settings, ProcessMapping } from 'ecoinvent-interface';
+import { Settings, ProcessMapping } from '@onwp/ecoinvent-interface';
 
 const settings = new Settings({
   username: 'your-username',
@@ -183,7 +196,7 @@ const match = mapping.findClosestMatch(localProcess, remoteMapping, 10); // thre
 The library provides a logging system with different log levels:
 
 ```javascript
-import { LogLevel, setLogLevel, getLogger } from 'ecoinvent-interface';
+import { LogLevel, setLogLevel, getLogger } from '@onwp/ecoinvent-interface';
 
 // Set the global log level
 setLogLevel(LogLevel.DEBUG);
@@ -224,7 +237,7 @@ This library works in both Node.js and browser environments. In browser environm
 
 ```jsx
 import React, { useState } from 'react';
-import { Settings, EcoinventRelease } from 'ecoinvent-interface';
+import { Settings, EcoinventRelease } from '@onwp/ecoinvent-interface';
 
 function EcoinventLogin() {
   const [username, setUsername] = useState('');

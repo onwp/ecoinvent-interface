@@ -1,5 +1,5 @@
 {
-  "name": "@your-org/ecoinvent-interface",
+  "name": "@onwp/ecoinvent-interface",
   "version": "1.0.0",
   "description": "JavaScript interface for accessing ecoinvent data",
   "type": "module",
@@ -24,6 +24,13 @@
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/onwp/ecoinvent-interface-js.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.3",
     "@rollup/plugin-node-resolve": "^16.0.1",
