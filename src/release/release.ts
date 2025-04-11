@@ -292,13 +292,18 @@ export class EcoinventRelease extends InterfaceBase {
       try {
         const actual = fs.statSync(filepath).size;
         if (actual !== expectedSize) {
-          console.error(`Downloaded file doesn't match expected size:
+          console.warn(`Downloaded file doesn't match expected size:
             Actual: ${actual}
             Expected: ${expectedSize}
           Proceeding anyways as no download error occurred.`);
         }
       } catch (error) {
-        console.error('Error checking file size:', error);
+        // Just log a warning for missing files instead of an error
+        console.warn(`File not found during size check: ${filepath}`);
+        // Only log the full error in debug mode
+        if (process.env.DEBUG) {
+          console.debug('Error details:', error);
+        }
       }
     }
 

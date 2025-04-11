@@ -2,6 +2,12 @@ import axios from 'axios';
 import { EcoinventRelease, ReleaseType } from './release';
 import { Settings } from '../core/settings';
 
+// Mock fs module to avoid ENOENT errors during tests
+jest.mock('fs', () => ({
+  ...jest.requireActual('fs'),
+  statSync: jest.fn().mockReturnValue({ size: 1000 }),
+}));
+
 // Mock axios
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -34,10 +40,10 @@ describe('EcoinventRelease', () => {
       username: 'test-user',
       password: 'test-pass',
     });
-    
+
     // Create EcoinventRelease instance
     const ecoinventRelease = new EcoinventRelease(settings);
-    
+
     // Mock successful login response
     mockedAxios.post.mockResolvedValueOnce({
       data: {
@@ -49,10 +55,10 @@ describe('EcoinventRelease', () => {
       headers: {},
       config: {},
     });
-    
+
     // Login first
     await ecoinventRelease.login();
-    
+
     // Mock reports response
     mockedAxios.get.mockResolvedValueOnce({
       data: [
@@ -75,10 +81,10 @@ describe('EcoinventRelease', () => {
       headers: {},
       config: {},
     });
-    
+
     // List report files
     const reports = await ecoinventRelease.listReportFiles();
-    
+
     // Verify reports were returned
     expect(Object.keys(reports)).toHaveLength(2);
     expect(reports['report1.pdf']).toBeDefined();
@@ -93,10 +99,10 @@ describe('EcoinventRelease', () => {
       username: 'test-user',
       password: 'test-pass',
     });
-    
+
     // Create EcoinventRelease instance
     const ecoinventRelease = new EcoinventRelease(settings);
-    
+
     // Mock successful login response
     mockedAxios.post.mockResolvedValueOnce({
       data: {
@@ -108,10 +114,10 @@ describe('EcoinventRelease', () => {
       headers: {},
       config: {},
     });
-    
+
     // Login first
     await ecoinventRelease.login();
-    
+
     // Mock reports response
     mockedAxios.get.mockResolvedValueOnce({
       data: [
@@ -127,7 +133,7 @@ describe('EcoinventRelease', () => {
       headers: {},
       config: {},
     });
-    
+
     // Mock S3 link response
     mockedAxios.get.mockResolvedValueOnce({
       data: {
@@ -138,19 +144,15 @@ describe('EcoinventRelease', () => {
       headers: {},
       config: {},
     });
-    
+
     // Mock streaming download
     jest.spyOn(ecoinventRelease as any, '_streamingDownload').mockResolvedValueOnce(undefined);
-    
-    // Mock fs.statSync to avoid ENOENT error
-    jest.mock('fs', () => ({
-      ...jest.requireActual('fs'),
-      statSync: jest.fn().mockReturnValue({ size: 1000 }),
-    }));
-    
+
+    // fs.statSync is already mocked at the top of the file
+
     // Get report
     const reportPath = await ecoinventRelease.getReport('report1.pdf');
-    
+
     // Verify report path was returned
     expect(reportPath).toBe('/mock/cache/dir/report1.pdf');
   });
@@ -161,10 +163,10 @@ describe('EcoinventRelease', () => {
       username: 'test-user',
       password: 'test-pass',
     });
-    
+
     // Create EcoinventRelease instance
     const ecoinventRelease = new EcoinventRelease(settings);
-    
+
     // Mock successful login response
     mockedAxios.post.mockResolvedValueOnce({
       data: {
@@ -176,10 +178,10 @@ describe('EcoinventRelease', () => {
       headers: {},
       config: {},
     });
-    
+
     // Login first
     await ecoinventRelease.login();
-    
+
     // Mock _getFilesForVersion to return a specific object
     jest.spyOn(ecoinventRelease as any, '_getFilesForVersion').mockResolvedValueOnce({
       version_name: '3.9.1',
@@ -198,10 +200,10 @@ describe('EcoinventRelease', () => {
         },
       ],
     });
-    
+
     // List extra files
     const extraFiles = await ecoinventRelease.listExtraFiles('3.9.1');
-    
+
     // Verify extra files were returned
     expect(Object.keys(extraFiles)).toHaveLength(2);
     expect(extraFiles['extra1.xlsx']).toBeDefined();
@@ -216,10 +218,10 @@ describe('EcoinventRelease', () => {
       username: 'test-user',
       password: 'test-pass',
     });
-    
+
     // Create EcoinventRelease instance
     const ecoinventRelease = new EcoinventRelease(settings);
-    
+
     // Mock successful login response
     mockedAxios.post.mockResolvedValueOnce({
       data: {
@@ -231,10 +233,10 @@ describe('EcoinventRelease', () => {
       headers: {},
       config: {},
     });
-    
+
     // Login first
     await ecoinventRelease.login();
-    
+
     // Mock _getFilesForVersion to return a specific object
     jest.spyOn(ecoinventRelease as any, '_getFilesForVersion').mockResolvedValueOnce({
       version_name: '3.9.1',
@@ -247,7 +249,7 @@ describe('EcoinventRelease', () => {
         },
       ],
     });
-    
+
     // Mock S3 link response
     mockedAxios.get.mockResolvedValueOnce({
       data: {
@@ -258,19 +260,15 @@ describe('EcoinventRelease', () => {
       headers: {},
       config: {},
     });
-    
+
     // Mock streaming download
     jest.spyOn(ecoinventRelease as any, '_streamingDownload').mockResolvedValueOnce(undefined);
-    
-    // Mock fs.statSync to avoid ENOENT error
-    jest.mock('fs', () => ({
-      ...jest.requireActual('fs'),
-      statSync: jest.fn().mockReturnValue({ size: 1000 }),
-    }));
-    
+
+    // fs.statSync is already mocked at the top of the file
+
     // Get extra file
     const extraPath = await ecoinventRelease.getExtra('3.9.1', 'extra1.xlsx');
-    
+
     // Verify extra file path was returned
     expect(extraPath).toBe('/mock/cache/dir/extra1.xlsx');
   });
@@ -281,10 +279,10 @@ describe('EcoinventRelease', () => {
       username: 'test-user',
       password: 'test-pass',
     });
-    
+
     // Create EcoinventRelease instance
     const ecoinventRelease = new EcoinventRelease(settings);
-    
+
     // Mock successful login response
     mockedAxios.post.mockResolvedValueOnce({
       data: {
@@ -296,10 +294,10 @@ describe('EcoinventRelease', () => {
       headers: {},
       config: {},
     });
-    
+
     // Login first
     await ecoinventRelease.login();
-    
+
     // Mock _getFilesForVersion to return a specific object
     jest.spyOn(ecoinventRelease as any, '_getFilesForVersion').mockResolvedValueOnce({
       version_name: '3.9.1',
@@ -314,10 +312,10 @@ describe('EcoinventRelease', () => {
         },
       ],
     });
-    
+
     // Get release files
     const releaseFiles = await ecoinventRelease.getReleaseFiles('3.9.1');
-    
+
     // Verify release files were returned
     expect(releaseFiles).toHaveLength(2);
     expect(releaseFiles[0].system_model_name).toBe('cutoff');
@@ -330,10 +328,10 @@ describe('EcoinventRelease', () => {
       username: 'test-user',
       password: 'test-pass',
     });
-    
+
     // Create EcoinventRelease instance
     const ecoinventRelease = new EcoinventRelease(settings);
-    
+
     // Mock successful login response
     mockedAxios.post.mockResolvedValueOnce({
       data: {
@@ -345,10 +343,10 @@ describe('EcoinventRelease', () => {
       headers: {},
       config: {},
     });
-    
+
     // Login first
     await ecoinventRelease.login();
-    
+
     // Mock _filenameDict to return a specific object
     jest.spyOn(ecoinventRelease as any, '_filenameDict').mockResolvedValueOnce({
       'ecoinvent 3.9.1_cutoff_ecoSpold02.7z': {
@@ -357,13 +355,13 @@ describe('EcoinventRelease', () => {
         modified: new Date('2023-01-01T00:00:00Z'),
       },
     });
-    
+
     // Mock _downloadAndCache to return a specific path
     jest.spyOn(ecoinventRelease as any, '_downloadAndCache').mockResolvedValueOnce('/mock/cache/dir/extracted');
-    
+
     // Get release file
     const releasePath = await ecoinventRelease.getRelease('3.9.1', 'cutoff', ReleaseType.ECOSPOLD);
-    
+
     // Verify release file path was returned
     expect(releasePath).toBe('/mock/cache/dir/extracted');
   });
@@ -374,10 +372,10 @@ describe('EcoinventRelease', () => {
       username: 'test-user',
       password: 'test-pass',
     });
-    
+
     // Create EcoinventRelease instance
     const ecoinventRelease = new EcoinventRelease(settings);
-    
+
     // Mock successful login response
     mockedAxios.post.mockResolvedValueOnce({
       data: {
@@ -389,10 +387,10 @@ describe('EcoinventRelease', () => {
       headers: {},
       config: {},
     });
-    
+
     // Login first
     await ecoinventRelease.login();
-    
+
     // Mock _getFilesForVersion to return a specific object
     jest.spyOn(ecoinventRelease as any, '_getFilesForVersion').mockResolvedValueOnce({
       version_name: '3.9.1',
@@ -411,10 +409,10 @@ describe('EcoinventRelease', () => {
         },
       ],
     });
-    
+
     // Create filename dictionary
     const filenameDict = await (ecoinventRelease as any)._filenameDict('3.9.1');
-    
+
     // Verify filename dictionary was created
     expect(Object.keys(filenameDict)).toHaveLength(2);
     expect(filenameDict['file1.7z']).toBeDefined();
@@ -429,10 +427,10 @@ describe('EcoinventRelease', () => {
       username: 'test-user',
       password: 'test-pass',
     });
-    
+
     // Create EcoinventRelease instance
     const ecoinventRelease = new EcoinventRelease(settings);
-    
+
     // Mock successful login response
     mockedAxios.post.mockResolvedValueOnce({
       data: {
@@ -444,19 +442,15 @@ describe('EcoinventRelease', () => {
       headers: {},
       config: {},
     });
-    
+
     // Login first
     await ecoinventRelease.login();
-    
+
     // Mock _downloadS3 to return a specific path
     jest.spyOn(ecoinventRelease as any, '_downloadS3').mockResolvedValueOnce('/mock/cache/dir/test-file.7z');
-    
-    // Mock fs.statSync to avoid ENOENT error
-    jest.mock('fs', () => ({
-      ...jest.requireActual('fs'),
-      statSync: jest.fn().mockReturnValue({ size: 1000 }),
-    }));
-    
+
+    // fs.statSync is already mocked at the top of the file
+
     // Download and cache file
     const filePath = await (ecoinventRelease as any)._downloadAndCache(
       'test-file.7z',
@@ -470,10 +464,10 @@ describe('EcoinventRelease', () => {
       'cutoff',
       'release'
     );
-    
+
     // Verify file path was returned
     expect(filePath).toBe('/mock/cache/dir/test-file.7z');
-    
+
     // Verify storage.addEntry was called
     expect(ecoinventRelease.storage.addEntry).toHaveBeenCalledWith(
       'test-file.7z',
