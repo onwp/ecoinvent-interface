@@ -24,7 +24,7 @@ interface CacheEntry {
     version?: string;
     kind: string;
 }
-interface Catalogue {
+interface Catalogue$1 {
     [key: string]: CacheEntry;
 }
 
@@ -57,11 +57,146 @@ declare class Settings implements ISettings {
 declare function permanentSetting(key: string, value: string): void;
 
 /**
+ * Synchronous JSON dictionary class
+ *
+ * This class mimics the Python Catalogue class, which is a MutableMapping
+ * that synchronizes with a JSON file on disk.
+ */
+declare class Catalogue implements Record<string, CacheEntry> {
+    private _filepath;
+    private _data;
+    [key: string]: any;
+    /**
+     * Create a new Catalogue instance
+     *
+     * @param filepath Path to the JSON file
+     */
+    constructor(filepath: string);
+    /**
+     * Load data from the JSON file
+     */
+    private _load;
+    /**
+     * Write data to the JSON file
+     *
+     * @param data Data to write
+     */
+    private _write;
+    /**
+     * Get a value from the catalogue
+     *
+     * @param key Key to get
+     */
+    get(key: string): CacheEntry | undefined;
+    /**
+     * Set a value in the catalogue
+     *
+     * @param key Key to set
+     * @param value Value to set
+     */
+    set(key: string, value: CacheEntry): void;
+    /**
+     * Delete a value from the catalogue
+     *
+     * @param key Key to delete
+     */
+    delete(key: string): void;
+    /**
+     * Check if a key exists in the catalogue
+     *
+     * @param key Key to check
+     */
+    has(key: string): boolean;
+    /**
+     * Get all keys in the catalogue
+     */
+    keys(): string[];
+    /**
+     * Get all values in the catalogue
+     */
+    values(): CacheEntry[];
+    /**
+     * Get all entries in the catalogue
+     */
+    entries(): [string, CacheEntry][];
+    /**
+     * Get the number of entries in the catalogue
+     */
+    get size(): number;
+}
+/**
+ * Browser-compatible catalogue class
+ *
+ * This class mimics the Catalogue class but uses IndexedDB for storage
+ * instead of a file on disk.
+ */
+declare class BrowserCatalogue implements Record<string, CacheEntry> {
+    private _data;
+    [key: string]: any;
+    /**
+     * Create a new BrowserCatalogue instance
+     */
+    constructor();
+    /**
+     * Load data from IndexedDB
+     */
+    load(): Promise<void>;
+    /**
+     * Save data to IndexedDB
+     */
+    save(): Promise<void>;
+    /**
+     * Get a value from the catalogue
+     *
+     * @param key Key to get
+     */
+    get(key: string): CacheEntry | undefined;
+    /**
+     * Set a value in the catalogue
+     *
+     * @param key Key to set
+     * @param value Value to set
+     */
+    set(key: string, value: CacheEntry): void;
+    /**
+     * Delete a value from the catalogue
+     *
+     * @param key Key to delete
+     */
+    delete(key: string): void;
+    /**
+     * Check if a key exists in the catalogue
+     *
+     * @param key Key to check
+     */
+    has(key: string): boolean;
+    /**
+     * Get all keys in the catalogue
+     */
+    keys(): string[];
+    /**
+     * Get all values in the catalogue
+     */
+    values(): CacheEntry[];
+    /**
+     * Get all entries in the catalogue
+     */
+    entries(): [string, CacheEntry][];
+    /**
+     * Get the number of entries in the catalogue
+     */
+    get size(): number;
+    /**
+     * Clear the catalogue
+     */
+    clear(): Promise<void>;
+}
+/**
  * Class for managing cached files
  */
 declare class CachedStorage {
     dir: string;
-    catalogue: Catalogue;
+    catalogue: Catalogue | BrowserCatalogue;
     /**
      * Create a new CachedStorage instance
      *
@@ -451,4 +586,4 @@ declare function getLogger(name: string): Logger;
 declare const VERSION = "1.0.0";
 
 export { CachedStorage, EcoinventProcess, EcoinventRelease, InterfaceBase, LogLevel, Logger, ProcessFileType, ProcessMapping, ReleaseType, SYSTEM_MODELS, SYSTEM_MODELS_REVERSE, Settings, URLS, VERSION, getLogger, permanentSetting, setLogLevel };
-export type { CacheEntry, Catalogue, FileMetadata, ISettings };
+export type { CacheEntry, Catalogue$1 as Catalogue, FileMetadata, ISettings };

@@ -1,9 +1,13 @@
-import { Catalogue, CacheEntry } from '../types';
+import { CacheEntry } from '../types';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { get, set, del, clear } from 'idb-keyval';
+import { get, set, clear } from 'idb-keyval';
 import envPaths from 'env-paths';
+import { getLogger } from '../utils/logger';
+
+// Initialize logger
+const logger = getLogger('CachedStorage');
 
 /**
  * Determine if code is running in a browser environment
@@ -26,11 +30,255 @@ function getDefaultCacheDir(): string {
 }
 
 /**
+ * Synchronous JSON dictionary class
+ *
+ * This class mimics the Python Catalogue class, which is a MutableMapping
+ * that synchronizes with a JSON file on disk.
+ */
+class Catalogue implements Record<string, CacheEntry> {
+  private _filepath: string;
+  private _data: Record<string, CacheEntry>;
+  [key: string]: any;
+
+  /**
+   * Create a new Catalogue instance
+   *
+   * @param filepath Path to the JSON file
+   */
+  constructor(filepath: string) {
+    this._filepath = filepath;
+
+    if (!fs.existsSync(this._filepath)) {
+      this._write({});
+    }
+
+    this._data = this._load();
+  }
+
+  /**
+   * Load data from the JSON file
+   */
+  private _load(): Record<string, CacheEntry> {
+    try {
+      const content = fs.readFileSync(this._filepath, 'utf8');
+      return JSON.parse(content);
+    } catch (error) {
+      logger.error(`Error loading catalogue from ${this._filepath}:`, error);
+      return {};
+    }
+  }
+
+  /**
+   * Write data to the JSON file
+   *
+   * @param data Data to write
+   */
+  private _write(data: Record<string, CacheEntry>): void {
+    try {
+      fs.writeFileSync(this._filepath, JSON.stringify(data, null, 2), 'utf8');
+    } catch (error) {
+      logger.error(`Error writing catalogue to ${this._filepath}:`, error);
+    }
+  }
+
+
+
+  /**
+   * Get a value from the catalogue
+   *
+   * @param key Key to get
+   */
+  get(key: string): CacheEntry | undefined {
+    return this._data[key];
+  }
+
+  /**
+   * Set a value in the catalogue
+   *
+   * @param key Key to set
+   * @param value Value to set
+   */
+  set(key: string, value: CacheEntry): void {
+    this._data[key] = value;
+    this._write(this._data);
+  }
+
+  /**
+   * Delete a value from the catalogue
+   *
+   * @param key Key to delete
+   */
+  delete(key: string): void {
+    delete this._data[key];
+    this._write(this._data);
+  }
+
+  /**
+   * Check if a key exists in the catalogue
+   *
+   * @param key Key to check
+   */
+  has(key: string): boolean {
+    return key in this._data;
+  }
+
+  /**
+   * Get all keys in the catalogue
+   */
+  keys(): string[] {
+    return Object.keys(this._data);
+  }
+
+  /**
+   * Get all values in the catalogue
+   */
+  values(): CacheEntry[] {
+    return Object.values(this._data);
+  }
+
+  /**
+   * Get all entries in the catalogue
+   */
+  entries(): [string, CacheEntry][] {
+    return Object.entries(this._data);
+  }
+
+  /**
+   * Get the number of entries in the catalogue
+   */
+  get size(): number {
+    return Object.keys(this._data).length;
+  }
+}
+
+/**
+ * Browser-compatible catalogue class
+ *
+ * This class mimics the Catalogue class but uses IndexedDB for storage
+ * instead of a file on disk.
+ */
+class BrowserCatalogue implements Record<string, CacheEntry> {
+  private _data: Record<string, CacheEntry>;
+  [key: string]: any;
+
+  /**
+   * Create a new BrowserCatalogue instance
+   */
+  constructor() {
+    this._data = {};
+  }
+
+  /**
+   * Load data from IndexedDB
+   */
+  async load(): Promise<void> {
+    try {
+      const data = await get('ecoinvent-catalogue');
+      if (data) {
+        this._data = data;
+      }
+    } catch (error) {
+      logger.error('Error loading catalogue from IndexedDB:', error);
+    }
+  }
+
+  /**
+   * Save data to IndexedDB
+   */
+  async save(): Promise<void> {
+    try {
+      await set('ecoinvent-catalogue', this._data);
+    } catch (error) {
+      logger.error('Error saving catalogue to IndexedDB:', error);
+    }
+  }
+
+  /**
+   * Get a value from the catalogue
+   *
+   * @param key Key to get
+   */
+  get(key: string): CacheEntry | undefined {
+    return this._data[key];
+  }
+
+  /**
+   * Set a value in the catalogue
+   *
+   * @param key Key to set
+   * @param value Value to set
+   */
+  set(key: string, value: CacheEntry): void {
+    this._data[key] = value;
+    this.save().catch(error => {
+      logger.error(`Error saving catalogue after setting ${key}:`, error);
+    });
+  }
+
+  /**
+   * Delete a value from the catalogue
+   *
+   * @param key Key to delete
+   */
+  delete(key: string): void {
+    delete this._data[key];
+    this.save().catch(error => {
+      logger.error(`Error saving catalogue after deleting ${key}:`, error);
+    });
+  }
+
+  /**
+   * Check if a key exists in the catalogue
+   *
+   * @param key Key to check
+   */
+  has(key: string): boolean {
+    return key in this._data;
+  }
+
+  /**
+   * Get all keys in the catalogue
+   */
+  keys(): string[] {
+    return Object.keys(this._data);
+  }
+
+  /**
+   * Get all values in the catalogue
+   */
+  values(): CacheEntry[] {
+    return Object.values(this._data);
+  }
+
+  /**
+   * Get all entries in the catalogue
+   */
+  entries(): [string, CacheEntry][] {
+    return Object.entries(this._data);
+  }
+
+  /**
+   * Get the number of entries in the catalogue
+   */
+  get size(): number {
+    return Object.keys(this._data).length;
+  }
+
+  /**
+   * Clear the catalogue
+   */
+  async clear(): Promise<void> {
+    this._data = {};
+    await this.save();
+  }
+}
+
+/**
  * Class for managing cached files
  */
 export class CachedStorage {
   dir: string;
-  catalogue: Catalogue;
+  catalogue: Catalogue | BrowserCatalogue;
 
   /**
    * Create a new CachedStorage instance
@@ -48,14 +296,11 @@ export class CachedStorage {
 
       // Initialize catalogue
       const cataloguePath = path.join(this.dir, 'catalogue.json');
-      if (!fs.existsSync(cataloguePath)) {
-        fs.writeFileSync(cataloguePath, '{}', 'utf8');
-      }
-
-      this.catalogue = JSON.parse(fs.readFileSync(cataloguePath, 'utf8'));
+      this.catalogue = new Catalogue(cataloguePath);
     } else {
       // Browser environment - use IndexedDB via idb-keyval
-      this.catalogue = {};
+      // Create a browser-compatible catalogue
+      this.catalogue = new BrowserCatalogue();
       this._loadCatalogue();
     }
   }
@@ -64,15 +309,8 @@ export class CachedStorage {
    * Load the catalogue from IndexedDB (browser only)
    */
   private async _loadCatalogue(): Promise<void> {
-    if (isBrowser()) {
-      try {
-        const catalogue = await get('ecoinvent-catalogue');
-        if (catalogue) {
-          this.catalogue = catalogue;
-        }
-      } catch (error) {
-        console.error('Error loading catalogue from IndexedDB:', error);
-      }
+    if (isBrowser() && this.catalogue instanceof BrowserCatalogue) {
+      await this.catalogue.load();
     }
   }
 
@@ -80,16 +318,12 @@ export class CachedStorage {
    * Save the catalogue to persistent storage
    */
   private _saveCatalogue(): void {
-    if (isBrowser()) {
-      // Save to IndexedDB
-      set('ecoinvent-catalogue', this.catalogue).catch(error => {
-        console.error('Error saving catalogue to IndexedDB:', error);
+    if (isBrowser() && this.catalogue instanceof BrowserCatalogue) {
+      this.catalogue.save().catch(error => {
+        logger.error('Error saving catalogue to IndexedDB:', error);
       });
-    } else {
-      // Save to file system
-      const cataloguePath = path.join(this.dir, 'catalogue.json');
-      fs.writeFileSync(cataloguePath, JSON.stringify(this.catalogue, null, 2), 'utf8');
     }
+    // No need to save for Node.js environment as the Catalogue class handles it automatically
   }
 
   /**
@@ -99,8 +333,11 @@ export class CachedStorage {
    * @param value Entry value
    */
   addEntry(key: string, value: CacheEntry): void {
-    this.catalogue[key] = value;
-    this._saveCatalogue();
+    if (this.catalogue instanceof Catalogue) {
+      this.catalogue.set(key, value);
+    } else if (this.catalogue instanceof BrowserCatalogue) {
+      this.catalogue.set(key, value);
+    }
   }
 
   /**
@@ -109,7 +346,10 @@ export class CachedStorage {
    * @param key Entry key
    */
   getEntry(key: string): CacheEntry | undefined {
-    return this.catalogue[key];
+    if (this.catalogue instanceof Catalogue || this.catalogue instanceof BrowserCatalogue) {
+      return this.catalogue.get(key);
+    }
+    return undefined;
   }
 
   /**
@@ -118,8 +358,9 @@ export class CachedStorage {
    * @param key Entry key
    */
   removeEntry(key: string): void {
-    delete this.catalogue[key];
-    this._saveCatalogue();
+    if (this.catalogue instanceof Catalogue || this.catalogue instanceof BrowserCatalogue) {
+      this.catalogue.delete(key);
+    }
   }
 
   /**
@@ -129,28 +370,37 @@ export class CachedStorage {
     if (isBrowser()) {
       // Clear IndexedDB
       clear().catch(error => {
-        console.error('Error clearing IndexedDB:', error);
-      });
-    } else {
-      // Clear file system
-      Object.keys(this.catalogue).forEach(key => {
-        const entry = this.catalogue[key];
-        try {
-          if (fs.existsSync(entry.path)) {
-            if (fs.statSync(entry.path).isDirectory()) {
-              fs.rmdirSync(entry.path, { recursive: true });
-            } else {
-              fs.unlinkSync(entry.path);
-            }
-          }
-        } catch (error) {
-          console.error(`Error removing ${entry.path}:`, error);
-        }
+        logger.error('Error clearing IndexedDB:', error);
       });
 
-      // Reset catalogue
-      this.catalogue = {};
-      this._saveCatalogue();
+      // Reset browser catalogue
+      if (this.catalogue instanceof BrowserCatalogue) {
+        this.catalogue.clear().catch(error => {
+          logger.error('Error clearing browser catalogue:', error);
+        });
+      }
+    } else {
+      // Clear file system
+      if (this.catalogue instanceof Catalogue) {
+        Object.keys(this.catalogue).forEach(key => {
+          const entry = this.catalogue[key];
+          try {
+            if (fs.existsSync(entry.path)) {
+              if (fs.statSync(entry.path).isDirectory()) {
+                fs.rmdirSync(entry.path, { recursive: true });
+              } else {
+                fs.unlinkSync(entry.path);
+              }
+            }
+          } catch (error) {
+            logger.error(`Error removing ${entry.path}:`, error);
+          }
+        });
+
+        // Reset catalogue by creating a new one
+        const cataloguePath = path.join(this.dir, 'catalogue.json');
+        this.catalogue = new Catalogue(cataloguePath);
+      }
     }
   }
 
