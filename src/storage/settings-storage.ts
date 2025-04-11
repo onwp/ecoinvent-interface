@@ -1,4 +1,4 @@
-import { get, set } from 'idb-keyval';
+import { get, set } from 'idb-keyval'; // Used in browser environments
 import * as fs from 'fs';
 import * as path from 'path';
 import envPaths from 'env-paths';
