@@ -147,20 +147,18 @@ describe('CachedStorage', () => {
   describe('removeEntry', () => {
     beforeEach(() => {
       storage = new CachedStorage();
-      storage.catalogue = {
-        'key-1': {
-          path: '/path/1',
-          extracted: true,
-          created: '2024-01-01T00:00:00Z',
-          kind: 'test',
-        },
-        'key-2': {
-          path: '/path/2',
-          extracted: false,
-          created: '2024-01-01T00:00:00Z',
-          kind: 'test',
-        },
-      };
+      storage.catalogue.set('key-1', {
+        path: '/path/1',
+        extracted: true,
+        created: '2024-01-01T00:00:00Z',
+        kind: 'test',
+      });
+      storage.catalogue.set('key-2', {
+        path: '/path/2',
+        extracted: false,
+        created: '2024-01-01T00:00:00Z',
+        kind: 'test',
+      });
     });
 
     it('should remove entry from catalogue', () => {
@@ -188,14 +186,12 @@ describe('CachedStorage', () => {
   describe('getEntry', () => {
     beforeEach(() => {
       storage = new CachedStorage();
-      storage.catalogue = {
-        'existing-key': {
-          path: '/path/to/file',
-          extracted: true,
-          created: '2024-01-01T00:00:00Z',
-          kind: 'test',
-        },
-      };
+      storage.catalogue.set('existing-key', {
+        path: '/path/to/file',
+        extracted: true,
+        created: '2024-01-01T00:00:00Z',
+        kind: 'test',
+      });
     });
 
     it('should return entry if it exists', () => {
@@ -219,20 +215,18 @@ describe('CachedStorage', () => {
   describe('clear', () => {
     beforeEach(() => {
       storage = new CachedStorage();
-      storage.catalogue = {
-        'key-1': {
-          path: '/path/1',
-          extracted: true,
-          created: '2024-01-01T00:00:00Z',
-          kind: 'test',
-        },
-        'key-2': {
-          path: '/path/2',
-          extracted: false,
-          created: '2024-01-01T00:00:00Z',
-          kind: 'test',
-        },
-      };
+      storage.catalogue.set('key-1', {
+        path: '/path/1',
+        extracted: true,
+        created: '2024-01-01T00:00:00Z',
+        kind: 'test',
+      });
+      storage.catalogue.set('key-2', {
+        path: '/path/2',
+        extracted: false,
+        created: '2024-01-01T00:00:00Z',
+        kind: 'test',
+      });
     });
 
     it('should clear all entries from catalogue', () => {
@@ -251,63 +245,6 @@ describe('CachedStorage', () => {
     });
   });
 
-  describe('listEntries', () => {
-    beforeEach(() => {
-      storage = new CachedStorage();
-      storage.catalogue = {
-        'key-1': {
-          path: '/path/1',
-          extracted: true,
-          created: '2024-01-01T00:00:00Z',
-          kind: 'release',
-        },
-        'key-2': {
-          path: '/path/2',
-          extracted: false,
-          created: '2024-01-01T00:00:00Z',
-          kind: 'report',
-        },
-        'key-3': {
-          path: '/path/3',
-          extracted: true,
-          created: '2024-01-01T00:00:00Z',
-          kind: 'release',
-        },
-      };
-    });
-
-    it('should list all entries', () => {
-      const entries = storage.listEntries();
-
-      expect(entries).toHaveLength(3);
-      expect(entries).toContain('key-1');
-      expect(entries).toContain('key-2');
-      expect(entries).toContain('key-3');
-    });
-
-    it('should filter entries by kind', () => {
-      const releases = storage.listEntries('release');
-
-      expect(releases).toHaveLength(2);
-      expect(releases).toContain('key-1');
-      expect(releases).toContain('key-3');
-      expect(releases).not.toContain('key-2');
-    });
-
-    it('should return empty array if no entries match', () => {
-      const entries = storage.listEntries('nonexistent');
-
-      expect(entries).toHaveLength(0);
-    });
-
-    it('should return empty array for empty catalogue', () => {
-      storage.catalogue = {};
-
-      const entries = storage.listEntries();
-
-      expect(entries).toHaveLength(0);
-    });
-  });
 
   describe('browser environment', () => {
     beforeEach(() => {

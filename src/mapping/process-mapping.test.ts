@@ -343,7 +343,7 @@ describe('ProcessMapping', () => {
 
       // Mock existing mappings.zip with valid ZIP data
       mockedFs.existsSync.mockReturnValue(true);
-      mockedFs.readFileSync.mockReturnValue(zipBuffer);
+      mockedFs.readFileSync.mockReturnValue(zipBuffer as any);
       mockedFs.writeFileSync.mockImplementation(() => {});
       mockedFs.copyFileSync.mockImplementation(() => {});
 
