@@ -1,6 +1,6 @@
 # ecoinvent-interface
 
-[![npm version](https://img.shields.io/npm/v/@onwp/ecoinvent-interface)](https://github.com/onwp/ecoinvent-interface/packages)
+[![npm version](https://img.shields.io/npm/v/ecoinvent-interface)](https://www.npmjs.com/package/ecoinvent-interface)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 A JavaScript/TypeScript library for accessing ecoinvent Life Cycle Assessment (LCA) data. Works in both Node.js and browser environments.
@@ -12,18 +12,18 @@ A JavaScript/TypeScript library for accessing ecoinvent Life Cycle Assessment (L
 ### Installation
 
 ```bash
-npm install @onwp/ecoinvent-interface
+npm install ecoinvent-interface
 ```
 
 Or with yarn:
 ```bash
-yarn add @onwp/ecoinvent-interface
+yarn add ecoinvent-interface
 ```
 
 ### Your First Request
 
 ```javascript
-import { Settings, EcoinventRelease } from '@onwp/ecoinvent-interface';
+import { Settings, EcoinventRelease } from 'ecoinvent-interface';
 
 // 1. Set up credentials
 const settings = new Settings({
@@ -56,7 +56,7 @@ You **must** have:
 ### 1. List Available Versions
 
 ```javascript
-import { Settings, EcoinventRelease } from '@onwp/ecoinvent-interface';
+import { Settings, EcoinventRelease } from 'ecoinvent-interface';
 
 const ei = new EcoinventRelease(new Settings({
   username: 'your-username',
@@ -71,7 +71,7 @@ console.log(versions);
 ### 2. Download a Database Release
 
 ```javascript
-import { EcoinventRelease, ReleaseType } from '@onwp/ecoinvent-interface';
+import { EcoinventRelease, ReleaseType } from 'ecoinvent-interface';
 
 const ei = new EcoinventRelease(settings);
 await ei.login();
@@ -84,7 +84,7 @@ console.log('Downloaded to:', path);
 ### 3. Get Process Information
 
 ```javascript
-import { EcoinventProcess, ProcessFileType } from '@onwp/ecoinvent-interface';
+import { EcoinventProcess, ProcessFileType } from 'ecoinvent-interface';
 
 const process = new EcoinventProcess(settings);
 await process.login();
@@ -140,7 +140,7 @@ const settings = new Settings(); // Reads from environment automatically
 ### Option 3: Persistent Storage
 
 ```javascript
-import { permanentSetting } from '@onwp/ecoinvent-interface';
+import { permanentSetting } from 'ecoinvent-interface';
 
 // Store once
 permanentSetting('username', 'your-username');
@@ -153,7 +153,7 @@ const settings = new Settings(); // Reads from storage automatically
 ## Available Data Formats
 
 ```javascript
-import { ReleaseType } from '@onwp/ecoinvent-interface';
+import { ReleaseType } from 'ecoinvent-interface';
 
 // Choose your format:
 ReleaseType.ECOSPOLD        // Unit process XML files
@@ -186,7 +186,7 @@ Works out of the box in browsers:
 <html>
 <head>
   <script type="module">
-    import { Settings, EcoinventRelease } from '@onwp/ecoinvent-interface';
+    import { Settings, EcoinventRelease } from 'ecoinvent-interface';
 
     const settings = new Settings({
       username: 'your-username',
@@ -210,7 +210,7 @@ Works out of the box in browsers:
 
 ```jsx
 import React, { useState, useEffect } from 'react';
-import { Settings, EcoinventRelease } from '@onwp/ecoinvent-interface';
+import { Settings, EcoinventRelease } from 'ecoinvent-interface';
 
 function EcoinventData() {
   const [versions, setVersions] = useState([]);
@@ -252,7 +252,7 @@ function EcoinventData() {
 ### Process Mapping with Fuzzy Matching
 
 ```javascript
-import { ProcessMapping } from '@onwp/ecoinvent-interface';
+import { ProcessMapping } from 'ecoinvent-interface';
 
 const mapping = new ProcessMapping(settings);
 
@@ -283,7 +283,7 @@ const match = mapping.findClosestMatch(
 ### Get Excel LCIA Files
 
 ```javascript
-import { getExcelLciaFileForVersion } from '@onwp/ecoinvent-interface';
+import { getExcelLciaFileForVersion } from 'ecoinvent-interface';
 
 const excelPath = await getExcelLciaFileForVersion(ei, '3.9.1');
 console.log('LCIA Excel file:', excelPath);
@@ -292,7 +292,7 @@ console.log('LCIA Excel file:', excelPath);
 ### Logging and Debugging
 
 ```javascript
-import { setLogLevel, LogLevel } from '@onwp/ecoinvent-interface';
+import { setLogLevel, LogLevel } from 'ecoinvent-interface';
 
 // Enable debug logging
 setLogLevel(LogLevel.DEBUG);
@@ -375,7 +375,7 @@ import {
   EcoinventProcess,
   ProcessFileType,
   ISettings
-} from '@onwp/ecoinvent-interface';
+} from 'ecoinvent-interface';
 
 const settings: ISettings = {
   username: 'user',

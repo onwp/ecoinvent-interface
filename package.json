@@ -1,5 +1,5 @@
 {
-  "name": "@onwp/ecoinvent-interface",
+  "name": "ecoinvent-interface",
   "version": "1.1.0",
   "description": "JavaScript interface for accessing ecoinvent data",
   "type": "module",
