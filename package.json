@@ -38,7 +38,7 @@
     "url": "https://github.com/onwp/ecoinvent-interface/issues"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.3",

@@ -11,22 +11,13 @@ A JavaScript/TypeScript library for accessing ecoinvent Life Cycle Assessment (L
 
 ### Installation
 
-**Option 1: Using npm (GitHub Packages)**
-
-1. Create a `.npmrc` file in your project root:
-```
-@onwp:registry=https://npm.pkg.github.com
-```
-
-2. Install the package:
 ```bash
 npm install @onwp/ecoinvent-interface
 ```
 
-**Option 2: Direct from GitHub**
-
+Or with yarn:
 ```bash
-npm install github:onwp/ecoinvent-interface
+yarn add @onwp/ecoinvent-interface
 ```
 
 ### Your First Request
