@@ -4,7 +4,7 @@ import { SYSTEM_MODELS } from '../types';
 import { getLogger } from '../utils/logger';
 
 // Define version here to avoid circular dependencies
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 
 // Initialize logger
 const logger = getLogger('EcoinventProcess');

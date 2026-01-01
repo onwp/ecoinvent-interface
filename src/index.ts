@@ -23,4 +23,4 @@ export { ProcessMapping } from './mapping/process-mapping';
 export { Logger, LogLevel, getLogger, setLogLevel } from './utils/logger';
 
 // Package version
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
