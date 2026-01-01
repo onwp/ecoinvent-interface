@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { EcoinventRelease, ReleaseType } from './release';
+import { EcoinventRelease, ReleaseType, getExcelLciaFileForVersion } from './release';
 import { Settings } from '../core/settings';
 
 // Mock fs module to avoid ENOENT errors during tests
@@ -479,5 +479,247 @@ describe('EcoinventRelease', () => {
         kind: 'release',
       })
     );
+  });
+});
+
+describe('getExcelLciaFileForVersion', () => {
+  // Mock fs for this test suite
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('should throw error if release is not an instance of EcoinventRelease', async () => {
+    const notARelease = {} as any;
+
+    await expect(getExcelLciaFileForVersion(notARelease, '3.9.1')).rejects.toThrow(
+      'release must be an instance of EcoinventRelease'
+    );
+  });
+
+  test('should throw error for invalid version', async () => {
+    const settings = new Settings({
+      username: 'test-user',
+      password: 'test-pass',
+    });
+
+    const release = new EcoinventRelease(settings);
+
+    // Mock login
+    mockedAxios.post.mockResolvedValueOnce({
+      data: {
+        access_token: 'test-access-token',
+        refresh_token: 'test-refresh-token',
+      },
+    });
+
+    await release.login();
+
+    // Mock listVersions to return a specific list
+    jest.spyOn(release, 'listVersions').mockResolvedValueOnce(['3.9.1', '3.9', '3.8']);
+
+    await expect(getExcelLciaFileForVersion(release, 'invalid')).rejects.toThrow('Invalid version');
+  });
+
+  test('should throw error if no LCIA file found', async () => {
+    const settings = new Settings({
+      username: 'test-user',
+      password: 'test-pass',
+    });
+
+    const release = new EcoinventRelease(settings);
+
+    // Mock login
+    mockedAxios.post.mockResolvedValueOnce({
+      data: {
+        access_token: 'test-access-token',
+        refresh_token: 'test-refresh-token',
+      },
+    });
+
+    await release.login();
+
+    // Mock listVersions
+    jest.spyOn(release, 'listVersions').mockResolvedValueOnce(['3.9.1']);
+
+    // Mock listExtraFiles with no LCIA files
+    jest.spyOn(release, 'listExtraFiles').mockResolvedValueOnce({
+      'some-other-file.7z': {
+        uuid: 'uuid1',
+        size: 1000,
+        modified: new Date('2023-01-01'),
+      },
+    });
+
+    await expect(getExcelLciaFileForVersion(release, '3.9.1')).rejects.toThrow(
+      "Can't find LCIA file close to"
+    );
+  });
+
+  test('should throw error if LCIA file match is too different', async () => {
+    const settings = new Settings({
+      username: 'test-user',
+      password: 'test-pass',
+    });
+
+    const release = new EcoinventRelease(settings);
+
+    // Mock login
+    mockedAxios.post.mockResolvedValueOnce({
+      data: {
+        access_token: 'test-access-token',
+        refresh_token: 'test-refresh-token',
+      },
+    });
+
+    await release.login();
+
+    // Mock listVersions
+    jest.spyOn(release, 'listVersions').mockResolvedValueOnce(['3.9.1']);
+
+    // Mock listExtraFiles with a file that's too different
+    jest.spyOn(release, 'listExtraFiles').mockResolvedValueOnce({
+      'completely-different-filename.7z': {
+        uuid: 'uuid1',
+        size: 1000,
+        modified: new Date('2023-01-01'),
+      },
+    });
+
+    await expect(getExcelLciaFileForVersion(release, '3.9.1')).rejects.toThrow(
+      'but this is too different'
+    );
+  });
+
+  test('should find and download LCIA Excel file in Node.js', async () => {
+    const settings = new Settings({
+      username: 'test-user',
+      password: 'test-pass',
+    });
+
+    const release = new EcoinventRelease(settings);
+
+    // Mock login
+    mockedAxios.post.mockResolvedValueOnce({
+      data: {
+        access_token: 'test-access-token',
+        refresh_token: 'test-refresh-token',
+      },
+    });
+
+    await release.login();
+
+    // Mock listVersions
+    jest.spyOn(release, 'listVersions').mockResolvedValueOnce(['3.9.1']);
+
+    // Mock listExtraFiles with LCIA file
+    jest.spyOn(release, 'listExtraFiles').mockResolvedValueOnce({
+      'ecoinvent 3.9.1_LCIA_implementation.7z': {
+        uuid: 'uuid1',
+        size: 1000,
+        modified: new Date('2023-01-01'),
+      },
+    });
+
+    // Mock getExtra to return extracted directory
+    jest.spyOn(release, 'getExtra').mockResolvedValueOnce('/mock/cache/ecoinvent 3.9.1_LCIA_implementation');
+
+    // Mock fs.readdirSync to return Excel files
+    const fs = require('fs');
+    fs.readdirSync = jest.fn().mockReturnValue([
+      'LCIA_implementation_3.9.1.xlsx',
+      'readme.txt',
+      'other_file.csv',
+    ]);
+
+    const result = await getExcelLciaFileForVersion(release, '3.9.1');
+
+    expect(result).toContain('LCIA_implementation_3.9.1.xlsx');
+    expect(release.getExtra).toHaveBeenCalledWith('3.9.1', 'ecoinvent 3.9.1_LCIA_implementation.7z');
+  });
+
+  test('should throw error if Excel file not found in extracted directory', async () => {
+    const settings = new Settings({
+      username: 'test-user',
+      password: 'test-pass',
+    });
+
+    const release = new EcoinventRelease(settings);
+
+    // Mock login
+    mockedAxios.post.mockResolvedValueOnce({
+      data: {
+        access_token: 'test-access-token',
+        refresh_token: 'test-refresh-token',
+      },
+    });
+
+    await release.login();
+
+    // Mock listVersions
+    jest.spyOn(release, 'listVersions').mockResolvedValueOnce(['3.9.1']);
+
+    // Mock listExtraFiles
+    jest.spyOn(release, 'listExtraFiles').mockResolvedValueOnce({
+      'ecoinvent 3.9.1_LCIA_implementation.7z': {
+        uuid: 'uuid1',
+        size: 1000,
+        modified: new Date('2023-01-01'),
+      },
+    });
+
+    // Mock getExtra
+    jest.spyOn(release, 'getExtra').mockResolvedValueOnce('/mock/cache/ecoinvent 3.9.1_LCIA_implementation');
+
+    // Mock fs.readdirSync with no Excel files
+    const fs = require('fs');
+    fs.readdirSync = jest.fn().mockReturnValue(['readme.txt', 'other_file.csv']);
+
+    await expect(getExcelLciaFileForVersion(release, '3.9.1')).rejects.toThrow(
+      "Can't find LCIA Excel file like"
+    );
+  });
+
+  test('should handle browser environment', async () => {
+    // Mock browser environment
+    (global as any).window = {};
+
+    const settings = new Settings({
+      username: 'test-user',
+      password: 'test-pass',
+    });
+
+    const release = new EcoinventRelease(settings);
+
+    // Mock login
+    mockedAxios.post.mockResolvedValueOnce({
+      data: {
+        access_token: 'test-access-token',
+        refresh_token: 'test-refresh-token',
+      },
+    });
+
+    await release.login();
+
+    // Mock listVersions
+    jest.spyOn(release, 'listVersions').mockResolvedValueOnce(['3.9.1']);
+
+    // Mock listExtraFiles
+    jest.spyOn(release, 'listExtraFiles').mockResolvedValueOnce({
+      'ecoinvent 3.9.1_LCIA_implementation.7z': {
+        uuid: 'uuid1',
+        size: 1000,
+        modified: new Date('2023-01-01'),
+      },
+    });
+
+    // Mock getExtra
+    const mockPath = '/virtual/path/ecoinvent 3.9.1_LCIA_implementation';
+    jest.spyOn(release, 'getExtra').mockResolvedValueOnce(mockPath);
+
+    const result = await getExcelLciaFileForVersion(release, '3.9.1');
+
+    expect(result).toBe(mockPath);
+
+    delete (global as any).window;
   });
 });

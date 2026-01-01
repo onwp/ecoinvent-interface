@@ -273,4 +273,96 @@ export class ProcessMapping {
     logger.debug(`Found ${matches.length} matches out of ${localProcesses.length} local processes`);
     return matches;
   }
+
+  /**
+   * Add mapping data to the mappings archive
+   *
+   * Updates a zipped mappings archive by adding new mapping data as a JSON file.
+   * Creates a backup of the existing mappings file before updating.
+   *
+   * @param data Array of process information to store
+   * @param version Version identifier
+   * @param systemModel System model identifier
+   * @returns The filepath to the updated mappings file
+   */
+  async addMapping(data: ProcessInfo[], version: string, systemModel: string): Promise<string> {
+    if (typeof window !== 'undefined') {
+      throw new Error('addMapping is only supported in Node.js environment');
+    }
+
+    logger.debug(`Adding mapping for version=${version}, systemModel=${systemModel}`);
+
+    const fs = require('fs');
+    const path = require('path');
+    const JSZip = (await import('jszip')).default;
+
+    const mappingsFilename = 'mappings.zip';
+    const mappingsPath = path.join(this.storage.dir, mappingsFilename);
+    const newFilename = `${version}_${systemModel}.json`;
+
+    let zip = new JSZip();
+    let existingData: Record<string, any> = {};
+
+    // Load existing mappings if they exist
+    if (fs.existsSync(mappingsPath)) {
+      logger.debug(`Loading existing mappings from ${mappingsPath}`);
+      const zipData = fs.readFileSync(mappingsPath);
+      zip = await JSZip.loadAsync(zipData);
+
+      // Check if this version/system model combination already exists
+      if (zip.file(newFilename)) {
+        throw new Error(
+          `Mapping for version ${version} and system model ${systemModel} already exists. Delete the existing mapping first.`
+        );
+      }
+
+      // Load all existing files
+      const filePromises: Promise<void>[] = [];
+      zip.forEach((relativePath, zipEntry) => {
+        if (!zipEntry.dir) {
+          const promise = zipEntry.async('string').then(content => {
+            existingData[relativePath] = content;
+          });
+          filePromises.push(promise);
+        }
+      });
+      await Promise.all(filePromises);
+
+      // Create backup
+      const backupPath = mappingsPath.replace('.zip', '_backup.zip');
+      logger.debug(`Creating backup at ${backupPath}`);
+      fs.copyFileSync(mappingsPath, backupPath);
+    }
+
+    // Create new zip with existing data
+    zip = new JSZip();
+    for (const [filename, content] of Object.entries(existingData)) {
+      zip.file(filename, content);
+    }
+
+    // Add new mapping
+    logger.debug(`Adding new mapping file: ${newFilename}`);
+    zip.file(newFilename, JSON.stringify(data, null, 2));
+
+    // Generate the zip file
+    const zipContent = await zip.generateAsync({
+      type: 'nodebuffer',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 9 }
+    });
+
+    // Write to disk
+    fs.writeFileSync(mappingsPath, zipContent);
+    logger.debug(`Mappings file updated at ${mappingsPath}`);
+
+    // Update catalogue
+    this.storage.addEntry('mappings', {
+      path: mappingsPath,
+      extracted: false,
+      created: new Date().toISOString(),
+      kind: 'mappings',
+    });
+
+    return mappingsPath;
+  }
 }

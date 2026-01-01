@@ -588,3 +588,89 @@ export class EcoinventRelease extends InterfaceBase {
     }
   }
 }
+
+/**
+ * Get the Excel LCIA file for a specific version
+ *
+ * The Excel LCIA file has varying names depending on the version. This
+ * function downloads the LCIA file, if necessary, and returns the filepath
+ * of the Excel file for further use.
+ *
+ * @param release An instance of EcoinventRelease with valid settings
+ * @param version The ecoinvent version for which the LCIA file should be found
+ * @returns The filepath to the Excel LCIA file
+ */
+export async function getExcelLciaFileForVersion(
+  release: EcoinventRelease,
+  version: string
+): Promise<string> {
+  if (!(release instanceof EcoinventRelease)) {
+    throw new Error('release must be an instance of EcoinventRelease');
+  }
+
+  const versions = await release.listVersions();
+  if (!versions.includes(version)) {
+    throw new Error('Invalid version');
+  }
+
+  const filelist = await release.listExtraFiles(version);
+  const guess = `ecoinvent ${version}_LCIA_implementation.7z`;
+
+  // Find the closest match for the LCIA file
+  const possibles = Object.keys(filelist)
+    .filter(filename =>
+      filename.toLowerCase().includes('lcia') &&
+      filename.includes(version)
+    )
+    .map(filename => ({
+      distance: distance(filename, guess),
+      filename
+    }))
+    .sort((a, b) => a.distance - b.distance);
+
+  if (possibles.length === 0) {
+    throw new Error(`Can't find LCIA file close to ${guess} among ${Object.keys(filelist).join(', ')}`);
+  }
+
+  if (possibles[0].distance > 10) {
+    throw new Error(
+      `Closest LCIA filename match to ${guess} is ${possibles[0].filename}, but this is too different`
+    );
+  }
+
+  // Download and extract the LCIA file
+  const dirpath = await release.getExtra(version, possibles[0].filename);
+
+  // Find the Excel file in the extracted directory
+  if (typeof window === 'undefined') {
+    // Node.js environment
+    const fs = require('fs');
+    const path = require('path');
+
+    const excelGuess = `LCIA_implementation_${version}.xlsx`;
+    const files = fs.readdirSync(dirpath);
+
+    const excelPossibles = files
+      .filter((filename: string) =>
+        filename.toLowerCase().endsWith('.xlsx') &&
+        filename.includes(version)
+      )
+      .map((filename: string) => ({
+        distance: distance(filename, excelGuess),
+        filepath: path.join(dirpath, filename)
+      }))
+      .sort((a: any, b: any) => a.distance - b.distance);
+
+    if (excelPossibles.length > 0 && excelPossibles[0].distance < 10) {
+      return excelPossibles[0].filepath;
+    } else {
+      throw new Error(`Can't find LCIA Excel file like ${excelGuess} in ${files.join(', ')}`);
+    }
+  } else {
+    // Browser environment - return the directory path
+    // In browser, files are stored in IndexedDB, so we can't easily list them
+    // Return the directory path and let the caller handle it
+    console.warn('Excel file listing in browser environment is limited');
+    return dirpath;
+  }
+}

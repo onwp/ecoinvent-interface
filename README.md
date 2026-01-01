@@ -3,13 +3,24 @@
 [![GitHub package version](https://img.shields.io/github/package-json/v/onwp/ecoinvent-interface)](https://github.com/onwp/ecoinvent-interface/packages)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-A JavaScript library for accessing ecoinvent data. This is an **unofficial and unsupported** library.
+A TypeScript/JavaScript library for accessing ecoinvent Life Cycle Assessment (LCA) data. This is an **unofficial and unsupported** library, migrated from the [Python ecoinvent-interface package](https://pypi.org/project/ecoinvent-interface/).
+
+## Features
+
+- 🔐 **Authentication** - Secure login with username/password or environment variables
+- 📦 **Release Management** - Download and cache ecoinvent database releases
+- 📄 **Process Data** - Access individual process information and documentation
+- 🗺️ **Process Mapping** - Map between local and remote processes with fuzzy matching
+- 🌐 **Browser Support** - Works in both Node.js and browser environments
+- 💾 **Smart Caching** - Platform-specific caching with automatic extraction
+- 📊 **Multiple Formats** - Support for ecospold, matrix, LCI, LCIA, and Excel formats
+- 📝 **Logging** - Configurable logging system for debugging
 
 ## Installation
 
-This package is published to GitHub Packages. To install it, you'll need to configure npm to use GitHub Packages for the `@onwp` scope.
+This package is published to GitHub Packages. To install it, configure npm to use GitHub Packages for the `@onwp` scope:
 
-1. Create or edit a `.npmrc` file in your project root:
+1. Create or edit `.npmrc` in your project root:
 
 ```
 @onwp:registry=https://npm.pkg.github.com
@@ -24,182 +35,272 @@ This package is published to GitHub Packages. To install it, you'll need to conf
 npm install @onwp/ecoinvent-interface
 ```
 
-## Usage
+## Quick Start
 
-### Authentication via `Settings` object
+```typescript
+import { Settings, EcoinventRelease } from '@onwp/ecoinvent-interface';
 
-Authentication is done via the `Settings` object. Accessing ecoinvent requires supplying a username and password.
+// Create settings with credentials
+const settings = new Settings({
+  username: 'your-username',
+  password: 'your-password'
+});
 
-Note that you **must accept** the ecoinvent license and personal identifying information agreement on the website before using your user account via this library.
+// Initialize release interface
+const ei = new EcoinventRelease(settings);
 
-You can provide credentials in three ways:
+// Login and list available versions
+await ei.login();
+const versions = await ei.listVersions();
+console.log('Available versions:', versions);
+```
 
-* Manually, via arguments to the `Settings` object instantiation:
+## Authentication
 
-```javascript
+Authentication is managed through the `Settings` class. You **must accept** the ecoinvent license and personal identifying information agreement on the website before using your account.
+
+### Three Ways to Authenticate
+
+#### 1. Direct Credentials
+
+```typescript
 import { Settings } from '@onwp/ecoinvent-interface';
+
 const settings = new Settings({
   username: 'bob',
   password: 'example'
 });
 ```
 
-* Via environment variables (Node.js only):
+#### 2. Environment Variables (Node.js)
 
 ```bash
 export EI_USERNAME=bob
 export EI_PASSWORD=example
 ```
 
-```javascript
+```typescript
 import { Settings } from '@onwp/ecoinvent-interface';
+
 // Environment variables read automatically
 const settings = new Settings();
 ```
 
-* Via stored settings:
+#### 3. Stored Settings
 
-```javascript
+```typescript
 import { Settings, permanentSetting } from '@onwp/ecoinvent-interface';
+
+// Store settings permanently
 permanentSetting('username', 'bob');
 permanentSetting('password', 'example');
+
 // Stored settings read automatically
 const settings = new Settings();
 ```
 
-For each value, manually set values always take precedence over environment variables, which in turn take precedence over stored settings.
+Priority: Direct credentials > Environment variables > Stored settings
 
-### `EcoinventRelease` instantiation
+## API Reference
 
-To interact with the ecoinvent website, instantiate `EcoinventRelease`. You can specify your credentials manually when creating the class instance, or with the approaches outlined above.
+### EcoinventRelease
 
-```javascript
-import { EcoinventRelease } from '@onwp/ecoinvent-interface';
+Manage ecoinvent database releases, reports, and extra files.
+
+```typescript
+import { EcoinventRelease, ReleaseType } from '@onwp/ecoinvent-interface';
+
 const ei = new EcoinventRelease(settings);
-```
-
-All operations with `EcoinventRelease` require a valid login:
-
-```javascript
 await ei.login();
-```
 
-You need to choose a valid version. You can list the version identifiers:
-
-```javascript
+// List available versions
 const versions = await ei.listVersions();
-console.log(versions);
-// ['3.9.1', '3.9', '3.8', '3.7.1', '3.7', ...]
+// ['3.9.1', '3.9', '3.8', '3.7.1', ...]
+
+// List system models for a version
+const models = await ei.listSystemModels('3.9.1');
+// ['cutoff', 'consequential', 'apos', 'EN15804']
+
+// Download a release
+const releasePath = await ei.getRelease(
+  '3.9.1',
+  'cutoff',
+  ReleaseType.MATRIX
+);
+// '/path/to/cache/universal_matrix_export_3.9.1_cutoff'
 ```
 
-### `EcoinventRelease` *extra* files
+#### Release Types
 
-There are three kinds of files available: *reports*, *documentation* files, and what we call *extra* files. Let's see the *extra* files for version `'3.7.1'`:
+```typescript
+enum ReleaseType {
+  ECOSPOLD = 'ecospold',           // Unit process XML
+  MATRIX = 'matrix',               // Universal matrix export
+  LCI = 'lci',                     // Life cycle inventory XML
+  LCIA = 'lcia',                   // Impact assessment XML
+  CUMULATIVE_LCI = 'cumulative_lci',   // Cumulative LCI (Excel)
+  CUMULATIVE_LCIA = 'cumulative_lcia'  // Cumulative LCIA (Excel)
+}
+```
 
-```javascript
-const extraFiles = await ei.listExtraFiles('3.7.1');
-console.log(extraFiles);
+#### Extra Files
+
+```typescript
+// List extra files for a version
+const extraFiles = await ei.listExtraFiles('3.9.1');
 // {
-//   'ecoinvent 3.7.1_LCIA_implementation.7z': {
-//     uuid: ...,
-//     size: ...,
+//   'ecoinvent 3.9.1_LCIA_implementation.7z': {
+//     uuid: '...',
+//     size: 1234567,
 //     modified: Date(...)
 //   },
 //   ...
 // }
+
+// Download an extra file
+const filePath = await ei.getExtra('3.9.1', 'ecoinvent 3.9.1_LCIA_implementation.7z');
 ```
 
-You can download a specific file:
+#### Report Files
 
-```javascript
-const filePath = await ei.getExtra('3.7.1', 'ecoinvent 3.7.1_LCIA_implementation.7z');
-console.log(filePath);
-// '/path/to/cache/ecoinvent 3.7.1_LCIA_implementation.7z'
-```
-
-### `EcoinventRelease` *reports*
-
-Reports require a login but not a version number:
-
-```javascript
+```typescript
+// List report files
 const reports = await ei.listReportFiles();
-console.log(reports);
 // {
 //   'Allocation, cut-off, EN15804_documentation.pdf': {
-//     uuid: ...,
-//     size: ...,
+//     uuid: '...',
+//     size: 1234567,
 //     modified: Date(...),
-//     description: 'This document provides a documentation on the calculation of the indicators in the "Allocation, cut-off, EN15804" system model.'
+//     description: '...'
 //   },
 //   ...
 // }
-```
 
-Downloading follows the same pattern as before:
-
-```javascript
+// Download a report
 const reportPath = await ei.getReport('Allocation, cut-off, EN15804_documentation.pdf');
-console.log(reportPath);
-// '/path/to/cache/Allocation, cut-off, EN15804_documentation.pdf'
 ```
 
-### `EcoinventRelease` *release files*
+#### Get Excel LCIA File
 
-You can download release files for a specific version and system model:
+```typescript
+import { getExcelLciaFileForVersion } from '@onwp/ecoinvent-interface';
 
-```javascript
-import { ReleaseType } from '@onwp/ecoinvent-interface';
-
-const releasePath = await ei.getRelease('3.7.1', 'apos', ReleaseType.MATRIX);
-console.log(releasePath);
-// '/path/to/cache/universal_matrix_export_3.7.1_apos'
+// Get the Excel LCIA implementation file for a version
+// This handles varying filenames across versions
+const excelPath = await getExcelLciaFileForVersion(ei, '3.9.1');
+// '/path/to/cache/ecoinvent 3.9.1_LCIA_implementation/LCIA_implementation_3.9.1.xlsx'
 ```
 
-## Process Mapping
+### EcoinventProcess
 
-The library provides a `ProcessMapping` class for mapping between local and remote processes:
+Access individual process data and documentation.
 
-```javascript
-import { Settings, ProcessMapping } from '@onwp/ecoinvent-interface';
+```typescript
+import { EcoinventProcess, ProcessFileType } from '@onwp/ecoinvent-interface';
 
-const settings = new Settings({
-  username: 'your-username',
-  password: 'your-password',
-});
+const process = new EcoinventProcess(settings);
+await process.login();
+
+// Set release version and system model
+await process.setRelease('3.9.1', 'cutoff');
+
+// Select a process by dataset ID
+process.selectProcess('1');
+
+// Get basic information
+const info = await process.getBasicInfo();
+
+// Get documentation (XML)
+const docs = await process.getDocumentation();
+
+// Download process files
+const upr = await process.getFile(ProcessFileType.UPR, '/path/to/output');
+const lci = await process.getFile(ProcessFileType.LCI, '/path/to/output');
+const lcia = await process.getFile(ProcessFileType.LCIA, '/path/to/output');
+const pdf = await process.getFile(ProcessFileType.PDF, '/path/to/output');
+```
+
+#### Process File Types
+
+```typescript
+enum ProcessFileType {
+  UPR = 'upr',         // Unit Process
+  LCI = 'lci',         // Life Cycle Inventory
+  LCIA = 'lcia',       // Life Cycle Impact Assessment
+  PDF = 'pdf',         // Dataset Report (PDF)
+  UNDEFINED = 'undefined'  // Unlinked/multi-output datasets
+}
+```
+
+### ProcessMapping
+
+Map between local and remote processes with fuzzy matching.
+
+```typescript
+import { ProcessMapping } from '@onwp/ecoinvent-interface';
 
 const mapping = new ProcessMapping(settings);
 
-// Create a mapping of remote processes with progress tracking
-// The last parameter is the delay in ms between API calls (default: 100)
-const remoteMapping = await mapping.createRemoteMapping('3.9.1', 'cutoff', 100, 200);
+// Create a mapping of remote processes
+// Parameters: version, systemModel, maxId, delayMs (default: 100)
+const remoteMapping = await mapping.createRemoteMapping(
+  '3.9.1',
+  'cutoff',
+  100,
+  200  // 200ms delay between API calls
+);
 
-// Create a mapping of local processes with progress tracking and XML parsing
-// The second parameter enables verbose logging
-const localMapping = mapping.createLocalMapping('ecoinvent 3.9.1_cutoff_ecoSpold02.7z', true);
+// Create a mapping of local processes from downloaded release
+// The release must be in the cache (download it first with EcoinventRelease)
+const localMapping = mapping.createLocalMapping(
+  'ecoinvent 3.9.1_cutoff_ecoSpold02',
+  true  // verbose logging
+);
 
-// The local mapping includes parsed data from the XML files:
+// Local mapping includes parsed XML data:
 // - activity_name: The name of the activity
 // - reference_product: The name of the reference product
 // - geography: The geography code
-
-// Match local processes to remote processes using fuzzy matching
-const matches = mapping.matchProcesses(localMapping, remoteMapping);
-console.log(`Found ${matches.length} matches`);
+// - path: File path
+// - filename: File name
 
 // Find the closest match for a specific process
 const localProcess = localMapping[0];
-const match = mapping.findClosestMatch(localProcess, remoteMapping, 10); // threshold of 10
+const match = mapping.findClosestMatch(
+  localProcess,
+  remoteMapping,
+  10  // Levenshtein distance threshold
+);
+
+// Match all local processes to remote processes
+const matches = mapping.matchProcesses(
+  localMapping,
+  remoteMapping,
+  10  // threshold
+);
+console.log(`Found ${matches.length} matches`);
+
+// matches is an array of { local: ProcessInfo, remote: ProcessInfo }
+
+// Store mapping data to disk (Node.js only)
+const mappingsPath = await mapping.addMapping(
+  remoteMapping,
+  '3.9.1',
+  'cutoff'
+);
+// Creates/updates mappings.zip with the new data
+// Automatically creates a backup before updating
 ```
 
-## Logging
+### Logging
 
-The library provides a logging system with different log levels:
+Configure logging to control output verbosity.
 
-```javascript
+```typescript
 import { LogLevel, setLogLevel, getLogger } from '@onwp/ecoinvent-interface';
 
 // Set the global log level
-setLogLevel(LogLevel.DEBUG);
+setLogLevel(LogLevel.DEBUG);  // DEBUG, INFO, WARN, ERROR
 
 // Get a logger for a specific component
 const logger = getLogger('MyComponent');
@@ -215,13 +316,15 @@ logger.debug('This is a debug message');
 
 The library uses platform-specific directories for caching files and storing settings:
 
-- On macOS: `~/Library/Caches/ecoinvent-interface` for cache and `~/Library/Preferences/ecoinvent-interface` for settings
-- On Windows: `%LOCALAPPDATA%\ecoinvent-interface\Cache` for cache and `%APPDATA%\ecoinvent-interface\Config` for settings
-- On Linux: `~/.cache/ecoinvent-interface` for cache and `~/.config/ecoinvent-interface` for settings
+| Platform | Cache Directory | Settings Directory |
+|----------|----------------|-------------------|
+| macOS | `~/Library/Caches/ecoinvent-interface` | `~/Library/Preferences/ecoinvent-interface` |
+| Windows | `%LOCALAPPDATA%\ecoinvent-interface\Cache` | `%APPDATA%\ecoinvent-interface\Config` |
+| Linux | `~/.cache/ecoinvent-interface` | `~/.config/ecoinvent-interface` |
 
-You can specify a custom cache directory when creating a Settings instance:
+### Custom Cache Directory
 
-```javascript
+```typescript
 const settings = new Settings({
   username: 'your-username',
   password: 'your-password',
@@ -231,7 +334,29 @@ const settings = new Settings({
 
 ## Browser Support
 
-This library works in both Node.js and browser environments. In browser environments, files are stored in IndexedDB or localStorage, depending on the browser's capabilities.
+This library works in both Node.js and browser environments:
+
+- **Node.js**: Files are stored in the file system with automatic extraction
+- **Browser**: Files are stored in IndexedDB or localStorage (depending on capabilities)
+
+### Browser Example
+
+```typescript
+import { Settings, EcoinventRelease } from '@onwp/ecoinvent-interface';
+
+async function fetchVersions() {
+  const settings = new Settings({
+    username: 'bob',
+    password: 'example'
+  });
+
+  const ei = new EcoinventRelease(settings);
+  await ei.login();
+
+  const versions = await ei.listVersions();
+  return versions;
+}
+```
 
 ## React Example
 
@@ -267,30 +392,20 @@ function EcoinventLogin() {
   return (
     <div>
       <h1>Ecoinvent Login</h1>
-
       {error && <div className="error">{error}</div>}
 
-      <div>
-        <label>
-          Username:
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-        </label>
-      </div>
-
-      <div>
-        <label>
-          Password:
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-      </div>
+      <input
+        type="text"
+        placeholder="Username"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+      />
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
 
       <button onClick={handleLogin} disabled={loading}>
         {loading ? 'Logging in...' : 'Login'}
@@ -313,10 +428,59 @@ function EcoinventLogin() {
 export default EcoinventLogin;
 ```
 
+## Migration from Python
+
+This library is a faithful port of the [Python ecoinvent-interface package](https://pypi.org/project/ecoinvent-interface/) with the following additions:
+
+**New Features:**
+- `ProcessMapping.findClosestMatch()` - Find closest matching process
+- `ProcessMapping.matchProcesses()` - Match all processes with progress tracking
+- `ProcessMapping.addMapping()` - Store mappings to disk
+- Enhanced logging system with configurable log levels
+- Browser support with IndexedDB/localStorage
+- Progress bars for long-running operations
+
+**API Differences:**
+- Method names use camelCase instead of snake_case
+- Promises/async-await instead of synchronous calls
+- TypeScript type definitions included
+
+## Examples
+
+See the `examples/` directory for complete working examples:
+
+- `basic-usage.js` - Basic authentication and version listing
+- More examples coming soon
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Run tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Build the package
+npm run build
+
+# Development mode (watch for changes)
+npm run dev
+```
+
 ## License
 
 MIT
 
 ## Disclaimer
 
-This is an **unofficial and unsupported** library. It is not affiliated with or endorsed by ecoinvent.
+This is an **unofficial and unsupported** library. It is not affiliated with or endorsed by ecoinvent. Use at your own risk.
+
+The library interacts with an unpublished and under-development API. Breaking changes may occur without notice.
+
+## Acknowledgments
+
+This library is a TypeScript/JavaScript port of the original [Python ecoinvent-interface package](https://github.com/brightway-lca/ecoinvent_interface) by Chris Mutel and contributors.

@@ -11,7 +11,7 @@ export { InterfaceBase } from './core/interface-base';
 export { CachedStorage } from './storage/cached-storage';
 
 // Export release functionality
-export { EcoinventRelease, ReleaseType } from './release/release';
+export { EcoinventRelease, ReleaseType, getExcelLciaFileForVersion } from './release/release';
 
 // Export process functionality
 export { EcoinventProcess, ProcessFileType } from './process/process';
