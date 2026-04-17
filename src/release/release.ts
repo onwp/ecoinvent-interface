@@ -3,6 +3,11 @@ import { FileMetadata, SYSTEM_MODELS } from '../types';
 import { distance } from 'fastest-levenshtein';
 import * as path from 'path';
 import * as fs from 'fs';
+import { getLogger } from '../utils/logger';
+
+const logger = getLogger('EcoinventRelease');
+
+const ARCHIVE_EXT_RE = /\.(7z|zip)$/i;
 
 /**
  * Enum for different types of release files
@@ -189,7 +194,7 @@ export class EcoinventRelease extends InterfaceBase {
       const closestMatch = possibleMatches[0];
 
       if (closestMatch && closestMatch.distance <= 3) {
-        console.log(`Using close match ${closestMatch.name} for predicted filename ${actualFilename}`);
+        logger.info(`Using close match ${closestMatch.name} for predicted filename ${actualFilename}`);
         actualFilename = closestMatch.name;
       } else {
         const availableFilenames = Object.keys(availableFiles).join('\n\t');
@@ -250,9 +255,16 @@ export class EcoinventRelease extends InterfaceBase {
     systemModel?: string,
     kind: string = 'unknown'
   ): Promise<string> {
-    // Check if file is in cache
-    if (this.storage.catalogue[filename]) {
-      const cacheMeta = this.storage.catalogue[filename];
+    // Archives that get extracted were historically stored under a
+    // basename-without-extension key. Keep that as a fallback for lookup
+    // so existing caches keep working across upgrades.
+    const extractedKey = filename.replace(ARCHIVE_EXT_RE, '');
+    const cachedEntry =
+      this.storage.catalogue[filename] ||
+      (extract && extractedKey !== filename ? this.storage.catalogue[extractedKey] : undefined);
+
+    if (cachedEntry) {
+      const cacheMeta = cachedEntry;
 
       // Check if cache entry is consistent with request
       if (
@@ -292,17 +304,15 @@ export class EcoinventRelease extends InterfaceBase {
       try {
         const actual = fs.statSync(filepath).size;
         if (actual !== expectedSize) {
-          console.warn(`Downloaded file doesn't match expected size:
-            Actual: ${actual}
-            Expected: ${expectedSize}
-          Proceeding anyways as no download error occurred.`);
+          logger.warn(
+            `Downloaded file size (${actual}) doesn't match expected size ` +
+            `(${expectedSize}). Proceeding anyway as no download error occurred.`,
+          );
         }
       } catch (error) {
-        // Just log a warning for missing files instead of an error
-        console.warn(`File not found during size check: ${filepath}`);
-        // Only log the full error in debug mode
+        logger.warn(`File not found during size check: ${filepath}`);
         if (process.env.DEBUG) {
-          console.debug('Error details:', error);
+          logger.debug('Error details:', error);
         }
       }
     }
@@ -313,50 +323,51 @@ export class EcoinventRelease extends InterfaceBase {
         // Node.js environment
         try {
           const Seven = require('node-7z');
-          const path = require('path');
-          const fs = require('fs');
+          const nodePath = require('path');
+          const nodeFs = require('fs');
 
-          // Create directory for extraction
-          const directory = path.join(this.storage.dir, path.basename(filepath, '.7z'));
-          if (fs.existsSync(directory)) {
-            fs.rmSync(directory, { recursive: true, force: true });
+          const baseWithoutExt = nodePath.basename(filepath, '.7z');
+          const directory = nodePath.join(this.storage.dir, baseWithoutExt);
+          if (nodeFs.existsSync(directory)) {
+            nodeFs.rmSync(directory, { recursive: true, force: true });
           }
-          fs.mkdirSync(directory, { recursive: true });
+          nodeFs.mkdirSync(directory, { recursive: true });
 
-          // Extract 7z file
-          console.log(`Extracting 7z file to ${directory}...`);
+          logger.info(`Extracting 7z file to ${directory}...`);
 
-          // Use promise to wait for extraction to complete
           await new Promise((resolve, reject) => {
             const stream = Seven.extract(filepath, directory, { $progress: false });
 
             stream.on('end', () => {
-              console.log('Extraction complete');
+              logger.info('Extraction complete');
               resolve(null);
             });
 
             stream.on('error', (err: Error) => {
-              console.error('Extraction error:', err);
+              logger.error('Extraction error:', err);
               reject(err);
             });
           });
 
-          // Add to catalogue
-          this.storage.addEntry(path.basename(filepath, '.7z'), {
+          const entry = {
             path: directory,
-            archive: path.basename(filepath),
+            archive: nodePath.basename(filepath),
             extracted: true,
             created: new Date().toISOString(),
             system_model: systemModel,
             version: version,
             kind: kind,
-          });
+          };
+          // Register under both keys so lookups from either side hit the cache.
+          this.storage.addEntry(filename, entry);
+          if (baseWithoutExt !== filename) {
+            this.storage.addEntry(baseWithoutExt, entry);
+          }
 
           return directory;
         } catch (error) {
-          console.error('Error extracting 7z file:', error);
+          logger.error('Error extracting 7z file:', error);
 
-          // If extraction fails, just add the file to catalogue without extraction
           this.storage.addEntry(filename, {
             path: filepath,
             extracted: false,
@@ -369,68 +380,42 @@ export class EcoinventRelease extends InterfaceBase {
           return filepath;
         }
       } else {
-        // Browser environment
+        // Browser environment: 7z is not generally extractable in-browser.
+        // Attempt a gzip fallback for streams that happen to be gzip-compatible,
+        // otherwise persist the raw bytes so downstream code can handle it.
         try {
-          // For browser environments, we'll use fflate for 7z extraction
-          // Note: Full 7z support in browser is limited, but we can handle basic cases
           const { decompress } = await import('fflate');
 
-          // Create a virtual directory path
-          const directoryPath = `${filepath.substring(0, filepath.length - 3)}`;
+          const baseWithoutExt = filepath.replace(ARCHIVE_EXT_RE, '');
+          const directoryPath = baseWithoutExt;
 
-          // Read the file as ArrayBuffer
           const response = await fetch(filepath);
           const fileData = await response.arrayBuffer();
 
-          // Decompress the data
-          // Note: This is a simplified approach and may not work for all 7z files
-          // For full 7z support in browser, a more complex solution would be needed
-          console.log(`Extracting 7z file to virtual directory: ${directoryPath}...`);
+          logger.info(`Extracting 7z file to virtual directory: ${directoryPath}...`);
 
-          // Use fflate to decompress
-          // This is a simplified approach - full 7z support would require a dedicated 7z library
           const extractedFiles: Record<string, Uint8Array> = {};
 
           try {
-            // Try to decompress as gzip (some 7z files are gzip compatible)
-            // fflate's decompress needs a callback in browser environment
             const fileDataArray = new Uint8Array(fileData);
-
-            // Use a Promise to handle the async decompression
             const decompressed = await new Promise<Uint8Array>((resolve, reject) => {
-              try {
-                // Try to use decompress with callback
-                decompress(fileDataArray, (err, data) => {
-                  if (err) reject(err);
-                  else resolve(data);
-                });
-              } catch (e) {
-                // If the callback approach fails, try the sync version (for Node.js)
-                try {
-                  // @ts-ignore - This is a fallback for Node.js
-                  const data = decompress(fileDataArray);
-                  // @ts-ignore - We know this is a Uint8Array in Node.js
-                  resolve(data);
-                } catch (e2) {
-                  reject(e2);
-                }
-              }
+              decompress(fileDataArray, (err, data) => {
+                if (err) reject(err);
+                else resolve(data);
+              });
             });
 
             extractedFiles['data'] = decompressed;
-            console.log('Extraction complete using gzip decompression');
+            logger.info('Extraction complete using gzip decompression');
           } catch (e) {
-            console.warn('Could not extract 7z file in browser:', e);
-            // Fall back to storing the raw file
+            logger.warn('Could not extract 7z file in browser:', e);
             extractedFiles['data.7z'] = new Uint8Array(fileData);
           }
 
-          // Store the extracted files in IndexedDB
           const { set } = await import('idb-keyval');
           await set(`${directoryPath}_files`, extractedFiles);
 
-          // Add to catalogue
-          this.storage.addEntry(path.basename(filepath, '.7z'), {
+          const entry = {
             path: directoryPath,
             archive: path.basename(filepath),
             extracted: true,
@@ -438,13 +423,17 @@ export class EcoinventRelease extends InterfaceBase {
             system_model: systemModel,
             version: version,
             kind: kind,
-          });
+          };
+          this.storage.addEntry(filename, entry);
+          const baseKey = path.basename(filepath, '.7z');
+          if (baseKey !== filename) {
+            this.storage.addEntry(baseKey, entry);
+          }
 
           return directoryPath;
         } catch (error) {
-          console.error('Error extracting 7z file in browser:', error);
+          logger.error('Error extracting 7z file in browser:', error);
 
-          // If extraction fails, just add the file to catalogue without extraction
           this.storage.addEntry(filename, {
             path: filepath,
             extracted: false,
@@ -462,39 +451,39 @@ export class EcoinventRelease extends InterfaceBase {
         // Node.js environment
         try {
           const extractZip = require('extract-zip');
-          const path = require('path');
-          const fs = require('fs');
+          const nodePath = require('path');
+          const nodeFs = require('fs');
 
-          // Create directory for extraction
-          const directory = path.join(this.storage.dir, path.basename(filepath, '.zip'));
-          if (fs.existsSync(directory)) {
-            fs.rmSync(directory, { recursive: true, force: true });
+          const baseWithoutExt = nodePath.basename(filepath, '.zip');
+          const directory = nodePath.join(this.storage.dir, baseWithoutExt);
+          if (nodeFs.existsSync(directory)) {
+            nodeFs.rmSync(directory, { recursive: true, force: true });
           }
-          fs.mkdirSync(directory, { recursive: true });
+          nodeFs.mkdirSync(directory, { recursive: true });
 
-          // Extract zip file
-          console.log(`Extracting zip file to ${directory}...`);
+          logger.info(`Extracting zip file to ${directory}...`);
           await extractZip(filepath, { dir: directory });
 
-          // Add to catalogue
-          this.storage.addEntry(path.basename(filepath, '.zip'), {
+          const entry = {
             path: directory,
-            archive: path.basename(filepath),
+            archive: nodePath.basename(filepath),
             extracted: true,
             created: new Date().toISOString(),
             system_model: systemModel,
             version: version,
             kind: kind,
-          });
+          };
+          this.storage.addEntry(filename, entry);
+          if (baseWithoutExt !== filename) {
+            this.storage.addEntry(baseWithoutExt, entry);
+          }
 
-          // Remove the zip file after extraction
-          fs.unlinkSync(filepath);
+          nodeFs.unlinkSync(filepath);
 
           return directory;
         } catch (error) {
-          console.error('Error extracting zip file:', error);
+          logger.error('Error extracting zip file:', error);
 
-          // If extraction fails, just add the file to catalogue without extraction
           this.storage.addEntry(filename, {
             path: filepath,
             extracted: false,
@@ -509,22 +498,17 @@ export class EcoinventRelease extends InterfaceBase {
       } else {
         // Browser environment
         try {
-          // For browser environments, we'll use JSZip for zip extraction
           const JSZip = (await import('jszip')).default;
 
-          // Create a virtual directory path
-          const directoryPath = `${filepath.substring(0, filepath.length - 4)}`;
+          const directoryPath = filepath.replace(ARCHIVE_EXT_RE, '');
 
-          // Read the file as ArrayBuffer
           const response = await fetch(filepath);
           const fileData = await response.arrayBuffer();
 
-          // Load the zip file
-          console.log(`Extracting zip file to virtual directory: ${directoryPath}...`);
+          logger.info(`Extracting zip file to virtual directory: ${directoryPath}...`);
           const zip = new JSZip();
           const loadedZip = await zip.loadAsync(fileData);
 
-          // Extract all files
           const extractedFiles: Record<string, Uint8Array> = {};
           const extractionPromises: Promise<void>[] = [];
 
@@ -537,16 +521,13 @@ export class EcoinventRelease extends InterfaceBase {
             }
           });
 
-          // Wait for all files to be extracted
           await Promise.all(extractionPromises);
-          console.log('Extraction complete');
+          logger.info('Extraction complete');
 
-          // Store the extracted files in IndexedDB
           const { set } = await import('idb-keyval');
           await set(`${directoryPath}_files`, extractedFiles);
 
-          // Add to catalogue
-          this.storage.addEntry(path.basename(filepath, '.zip'), {
+          const entry = {
             path: directoryPath,
             archive: path.basename(filepath),
             extracted: true,
@@ -554,13 +535,17 @@ export class EcoinventRelease extends InterfaceBase {
             system_model: systemModel,
             version: version,
             kind: kind,
-          });
+          };
+          this.storage.addEntry(filename, entry);
+          const baseKey = path.basename(filepath, '.zip');
+          if (baseKey !== filename) {
+            this.storage.addEntry(baseKey, entry);
+          }
 
           return directoryPath;
         } catch (error) {
-          console.error('Error extracting zip file in browser:', error);
+          logger.error('Error extracting zip file in browser:', error);
 
-          // If extraction fails, just add the file to catalogue without extraction
           this.storage.addEntry(filename, {
             path: filepath,
             extracted: false,
@@ -670,7 +655,7 @@ export async function getExcelLciaFileForVersion(
     // Browser environment - return the directory path
     // In browser, files are stored in IndexedDB, so we can't easily list them
     // Return the directory path and let the caller handle it
-    console.warn('Excel file listing in browser environment is limited');
+    logger.warn('Excel file listing in browser environment is limited');
     return dirpath;
   }
 }

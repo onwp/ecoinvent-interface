@@ -576,9 +576,10 @@ describe('getExcelLciaFileForVersion', () => {
     // Mock listVersions
     jest.spyOn(release, 'listVersions').mockResolvedValueOnce(['3.9.1']);
 
-    // Mock listExtraFiles with a file that's too different
+    // Mock listExtraFiles with a file that matches the basic filter
+    // (contains 'lcia' and the version) but is still far from the guess.
     jest.spyOn(release, 'listExtraFiles').mockResolvedValueOnce({
-      'completely-different-filename.7z': {
+      'completely-unrelated-lcia-bundle-for-3.9.1-xyz-archive.7z': {
         uuid: 'uuid1',
         size: 1000,
         modified: new Date('2023-01-01'),
