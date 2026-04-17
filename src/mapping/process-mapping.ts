@@ -5,11 +5,27 @@ import * as fs from 'fs';
 import * as path from 'path';
 import ProgressBar from 'progress';
 import { XMLParser } from 'fast-xml-parser';
-import { distance, closest } from 'fastest-levenshtein';
+import { distance } from 'fastest-levenshtein';
 import { getLogger } from '../utils/logger';
 
 // Initialize logger
 const logger = getLogger('ProcessMapping');
+
+/**
+ * Extract the text content from an XML node parsed by fast-xml-parser.
+ *
+ * The parser returns either a plain string (for nodes without attributes)
+ * or an object with a `#text` property (for nodes with attributes).
+ * This helper normalizes both forms.
+ */
+function extractText(node: unknown): string | undefined {
+  if (typeof node === 'string') return node;
+  if (node && typeof node === 'object' && '#text' in (node as any)) {
+    const text = (node as any)['#text'];
+    return typeof text === 'string' ? text : undefined;
+  }
+  return undefined;
+}
 
 /**
  * Interface for process information
@@ -142,27 +158,32 @@ export class ProcessMapping {
           let geography = 'Unknown';
 
           try {
-            // Try to extract activity name
-            if (result.ecoSpold?.activityDataset?.[0]?.activityDescription?.activity?.[0]?.activityName?.[0]?.['#text']) {
-              activityName = result.ecoSpold.activityDataset[0].activityDescription.activity[0].activityName[0]['#text'];
-            }
+            const activityDescription =
+              result.ecoSpold?.activityDataset?.[0]?.activityDescription;
 
-            // Try to extract geography
-            if (result.ecoSpold?.activityDataset?.[0]?.activityDescription?.geography?.[0]?.shortName?.[0]?.['#text']) {
-              geography = result.ecoSpold.activityDataset[0].activityDescription.geography[0].shortName[0]['#text'];
-            }
+            const nameText = extractText(
+              activityDescription?.activity?.[0]?.activityName?.[0],
+            );
+            if (nameText) activityName = nameText;
 
-            // Try to extract reference product
-            // This is more complex as we need to find the exchange with groupType="ReferenceProduct"
-            const exchanges = result.ecoSpold?.activityDataset?.[0]?.flowData?.intermediateExchange || [];
+            const geoText = extractText(
+              activityDescription?.geography?.[0]?.shortName?.[0],
+            );
+            if (geoText) geography = geoText;
+
+            const exchanges =
+              result.ecoSpold?.activityDataset?.[0]?.flowData?.intermediateExchange || [];
             for (const exchange of exchanges) {
-              if (exchange['@_groupType'] === 'ReferenceProduct' && exchange.name?.[0]?.['#text']) {
-                referenceProduct = exchange.name[0]['#text'];
-                break;
+              if (exchange['@_groupType'] === 'ReferenceProduct') {
+                const refText = extractText(exchange.name?.[0]);
+                if (refText) {
+                  referenceProduct = refText;
+                  break;
+                }
               }
             }
           } catch (parseError) {
-            console.error(`Error parsing XML structure: ${parseError}`);
+            logger.error(`Error parsing XML structure: ${parseError}`);
           }
 
           localData.push({
@@ -177,15 +198,15 @@ export class ProcessMapping {
           progressBar.tick();
 
           if (verbose) {
-            console.log(`Processed ${filePath}`);
+            logger.info(`Processed ${filePath}`);
           }
         } catch (error) {
-          console.error(`Error processing ${filePath}:`, error);
+          logger.error(`Error processing ${filePath}:`, error);
         }
       }
     } else {
       // Browser environment - not supported yet
-      console.warn('Local mapping in browser environment is not supported yet');
+      logger.warn('Local mapping in browser environment is not supported yet');
     }
 
     return localData;

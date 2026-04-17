@@ -2,18 +2,18 @@ import { CacheEntry } from '../types';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { get, set, clear } from 'idb-keyval';
 import envPaths from 'env-paths';
 import { getLogger } from '../utils/logger';
 
-// Initialize logger
 const logger = getLogger('CachedStorage');
+
+const BROWSER_STORAGE_KEY = 'ecoinvent-interface-catalogue';
 
 /**
  * Determine if code is running in a browser environment
  */
 function isBrowser(): boolean {
-  return typeof window !== 'undefined' && typeof window.document !== 'undefined';
+  return typeof window !== 'undefined';
 }
 
 /**
@@ -22,255 +22,102 @@ function isBrowser(): boolean {
 function getDefaultCacheDir(): string {
   if (isBrowser()) {
     return 'ecoinvent-interface-cache';
-  } else {
-    // Use env-paths to get platform-specific paths
-    const paths = envPaths('ecoinvent-interface', { suffix: '' });
-    return paths.cache;
   }
+  const paths = envPaths('ecoinvent-interface', { suffix: '' });
+  return paths.cache;
 }
 
 /**
- * Synchronous JSON dictionary class
- *
- * This class mimics the Python Catalogue class, which is a MutableMapping
- * that synchronizes with a JSON file on disk.
+ * Catalogue type: a plain record keyed by filename, with helper methods
+ * attached via a Proxy so that both `catalogue[key]` and `catalogue.set(key, v)`
+ * work identically. Mutations are persisted through the provided `save` callback.
  */
-class Catalogue implements Record<string, CacheEntry> {
-  private _filepath: string;
-  private _data: Record<string, CacheEntry>;
-  [key: string]: any;
+export type Catalogue = Record<string, CacheEntry> & {
+  set(key: string, value: CacheEntry): void;
+  get(key: string): CacheEntry | undefined;
+  has(key: string): boolean;
+  delete(key: string): void;
+  keys(): string[];
+  values(): CacheEntry[];
+  entries(): [string, CacheEntry][];
+  readonly size: number;
+};
 
-  /**
-   * Create a new Catalogue instance
-   *
-   * @param filepath Path to the JSON file
-   */
-  constructor(filepath: string) {
-    this._filepath = filepath;
+const OPERATION_NAMES = new Set([
+  'set', 'get', 'has', 'delete', 'keys', 'values', 'entries', 'size',
+]);
 
-    if (!fs.existsSync(this._filepath)) {
-      this._write({});
-    }
+function createCatalogue(
+  save: (data: Record<string, CacheEntry>) => void,
+  initial: Record<string, CacheEntry> = {},
+): Catalogue {
+  const data: Record<string, CacheEntry> = { ...initial };
 
-    this._data = this._load();
-  }
-
-  /**
-   * Load data from the JSON file
-   */
-  private _load(): Record<string, CacheEntry> {
-    try {
-      const content = fs.readFileSync(this._filepath, 'utf8');
-      return JSON.parse(content);
-    } catch (error) {
-      logger.error(`Error loading catalogue from ${this._filepath}:`, error);
-      return {};
-    }
-  }
-
-  /**
-   * Write data to the JSON file
-   *
-   * @param data Data to write
-   */
-  private _write(data: Record<string, CacheEntry>): void {
-    try {
-      fs.writeFileSync(this._filepath, JSON.stringify(data, null, 2), 'utf8');
-    } catch (error) {
-      logger.error(`Error writing catalogue to ${this._filepath}:`, error);
-    }
-  }
-
-
-
-  /**
-   * Get a value from the catalogue
-   *
-   * @param key Key to get
-   */
-  get(key: string): CacheEntry | undefined {
-    return this._data[key];
-  }
-
-  /**
-   * Set a value in the catalogue
-   *
-   * @param key Key to set
-   * @param value Value to set
-   */
-  set(key: string, value: CacheEntry): void {
-    this._data[key] = value;
-    this._write(this._data);
-  }
-
-  /**
-   * Delete a value from the catalogue
-   *
-   * @param key Key to delete
-   */
-  delete(key: string): void {
-    delete this._data[key];
-    this._write(this._data);
-  }
-
-  /**
-   * Check if a key exists in the catalogue
-   *
-   * @param key Key to check
-   */
-  has(key: string): boolean {
-    return key in this._data;
-  }
-
-  /**
-   * Get all keys in the catalogue
-   */
-  keys(): string[] {
-    return Object.keys(this._data);
-  }
-
-  /**
-   * Get all values in the catalogue
-   */
-  values(): CacheEntry[] {
-    return Object.values(this._data);
-  }
-
-  /**
-   * Get all entries in the catalogue
-   */
-  entries(): [string, CacheEntry][] {
-    return Object.entries(this._data);
-  }
-
-  /**
-   * Get the number of entries in the catalogue
-   */
-  get size(): number {
-    return Object.keys(this._data).length;
-  }
-}
-
-/**
- * Browser-compatible catalogue class
- *
- * This class mimics the Catalogue class but uses IndexedDB for storage
- * instead of a file on disk.
- */
-class BrowserCatalogue implements Record<string, CacheEntry> {
-  private _data: Record<string, CacheEntry>;
-  [key: string]: any;
-
-  /**
-   * Create a new BrowserCatalogue instance
-   */
-  constructor() {
-    this._data = {};
-  }
-
-  /**
-   * Load data from IndexedDB
-   */
-  async load(): Promise<void> {
-    try {
-      const data = await get('ecoinvent-catalogue');
-      if (data) {
-        this._data = data;
+  const ops = {
+    set(key: string, value: CacheEntry): void {
+      data[key] = value;
+      save(data);
+    },
+    get(key: string): CacheEntry | undefined {
+      return data[key];
+    },
+    has(key: string): boolean {
+      return Object.prototype.hasOwnProperty.call(data, key);
+    },
+    delete(key: string): void {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        delete data[key];
+        save(data);
       }
-    } catch (error) {
-      logger.error('Error loading catalogue from IndexedDB:', error);
-    }
-  }
+    },
+    keys(): string[] {
+      return Object.keys(data);
+    },
+    values(): CacheEntry[] {
+      return Object.values(data);
+    },
+    entries(): [string, CacheEntry][] {
+      return Object.entries(data);
+    },
+    get size(): number {
+      return Object.keys(data).length;
+    },
+  };
 
-  /**
-   * Save data to IndexedDB
-   */
-  async save(): Promise<void> {
-    try {
-      await set('ecoinvent-catalogue', this._data);
-    } catch (error) {
-      logger.error('Error saving catalogue to IndexedDB:', error);
-    }
-  }
-
-  /**
-   * Get a value from the catalogue
-   *
-   * @param key Key to get
-   */
-  get(key: string): CacheEntry | undefined {
-    return this._data[key];
-  }
-
-  /**
-   * Set a value in the catalogue
-   *
-   * @param key Key to set
-   * @param value Value to set
-   */
-  set(key: string, value: CacheEntry): void {
-    this._data[key] = value;
-    this.save().catch(error => {
-      logger.error(`Error saving catalogue after setting ${key}:`, error);
-    });
-  }
-
-  /**
-   * Delete a value from the catalogue
-   *
-   * @param key Key to delete
-   */
-  delete(key: string): void {
-    delete this._data[key];
-    this.save().catch(error => {
-      logger.error(`Error saving catalogue after deleting ${key}:`, error);
-    });
-  }
-
-  /**
-   * Check if a key exists in the catalogue
-   *
-   * @param key Key to check
-   */
-  has(key: string): boolean {
-    return key in this._data;
-  }
-
-  /**
-   * Get all keys in the catalogue
-   */
-  keys(): string[] {
-    return Object.keys(this._data);
-  }
-
-  /**
-   * Get all values in the catalogue
-   */
-  values(): CacheEntry[] {
-    return Object.values(this._data);
-  }
-
-  /**
-   * Get all entries in the catalogue
-   */
-  entries(): [string, CacheEntry][] {
-    return Object.entries(this._data);
-  }
-
-  /**
-   * Get the number of entries in the catalogue
-   */
-  get size(): number {
-    return Object.keys(this._data).length;
-  }
-
-  /**
-   * Clear the catalogue
-   */
-  async clear(): Promise<void> {
-    this._data = {};
-    await this.save();
-  }
+  return new Proxy(data, {
+    get(target, prop, receiver) {
+      if (typeof prop === 'string' && OPERATION_NAMES.has(prop)) {
+        const value = (ops as any)[prop];
+        return typeof value === 'function' ? value.bind(ops) : value;
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+    set(target, prop, value) {
+      if (typeof prop === 'string' && !OPERATION_NAMES.has(prop)) {
+        target[prop] = value as CacheEntry;
+        save(target);
+        return true;
+      }
+      return Reflect.set(target, prop, value);
+    },
+    deleteProperty(target, prop) {
+      if (typeof prop === 'string' && !OPERATION_NAMES.has(prop)) {
+        const existed = Object.prototype.hasOwnProperty.call(target, prop);
+        const result = Reflect.deleteProperty(target, prop);
+        if (existed) {
+          save(target);
+        }
+        return result;
+      }
+      return Reflect.deleteProperty(target, prop);
+    },
+    has(target, prop) {
+      if (typeof prop === 'string' && OPERATION_NAMES.has(prop)) {
+        return true;
+      }
+      return Reflect.has(target, prop);
+    },
+  }) as Catalogue;
 }
 
 /**
@@ -278,176 +125,141 @@ class BrowserCatalogue implements Record<string, CacheEntry> {
  */
 export class CachedStorage {
   dir: string;
-  catalogue: Catalogue | BrowserCatalogue;
+  catalogue: Catalogue;
+  private _browser: boolean;
 
-  /**
-   * Create a new CachedStorage instance
-   *
-   * @param cacheDir Optional custom cache directory
-   */
   constructor(cacheDir?: string) {
     this.dir = cacheDir || getDefaultCacheDir();
+    this._browser = isBrowser();
 
-    if (!isBrowser()) {
-      // Create directory if it doesn't exist
+    if (!this._browser) {
       if (!fs.existsSync(this.dir)) {
         fs.mkdirSync(this.dir, { recursive: true });
       }
-
-      // Initialize catalogue
       const cataloguePath = path.join(this.dir, 'catalogue.json');
-      this.catalogue = new Catalogue(cataloguePath);
+      const initial = this._loadFromDisk(cataloguePath);
+      this.catalogue = createCatalogue(
+        (data) => this._writeToDisk(cataloguePath, data),
+        initial,
+      );
     } else {
-      // Browser environment - use IndexedDB via idb-keyval
-      // Create a browser-compatible catalogue
-      this.catalogue = new BrowserCatalogue();
-      this._loadCatalogue();
+      const initial = this._loadFromLocalStorage();
+      this.catalogue = createCatalogue(
+        (data) => this._writeToLocalStorage(data),
+        initial,
+      );
     }
   }
 
-  /**
-   * Load the catalogue from IndexedDB (browser only)
-   */
-  private async _loadCatalogue(): Promise<void> {
-    if (isBrowser() && this.catalogue instanceof BrowserCatalogue) {
-      await this.catalogue.load();
+  private _loadFromDisk(cataloguePath: string): Record<string, CacheEntry> {
+    if (!fs.existsSync(cataloguePath)) {
+      this._writeToDisk(cataloguePath, {});
+      return {};
+    }
+    try {
+      const content = fs.readFileSync(cataloguePath, 'utf8');
+      return JSON.parse(content);
+    } catch (error) {
+      logger.error(`Error loading catalogue from ${cataloguePath}:`, error);
+      return {};
     }
   }
 
-  /**
-   * Save the catalogue to persistent storage
-   */
-  private _saveCatalogue(): void {
-    if (isBrowser() && this.catalogue instanceof BrowserCatalogue) {
-      this.catalogue.save().catch(error => {
-        logger.error('Error saving catalogue to IndexedDB:', error);
-      });
+  private _writeToDisk(cataloguePath: string, data: Record<string, CacheEntry>): void {
+    try {
+      fs.writeFileSync(cataloguePath, JSON.stringify(data, null, 2));
+    } catch (error) {
+      logger.error(`Error writing catalogue to ${cataloguePath}:`, error);
     }
-    // No need to save for Node.js environment as the Catalogue class handles it automatically
+  }
+
+  private _loadFromLocalStorage(): Record<string, CacheEntry> {
+    try {
+      const raw = (globalThis as any).localStorage?.getItem(BROWSER_STORAGE_KEY);
+      if (!raw) return {};
+      return JSON.parse(raw);
+    } catch (error) {
+      logger.error('Error loading catalogue from localStorage:', error);
+      return {};
+    }
+  }
+
+  private _writeToLocalStorage(data: Record<string, CacheEntry>): void {
+    try {
+      (globalThis as any).localStorage?.setItem(
+        BROWSER_STORAGE_KEY,
+        JSON.stringify(data),
+      );
+    } catch (error) {
+      logger.error('Error writing catalogue to localStorage:', error);
+    }
   }
 
   /**
    * Add an entry to the catalogue
-   *
-   * @param key Entry key
-   * @param value Entry value
    */
   addEntry(key: string, value: CacheEntry): void {
-    if (this.catalogue instanceof Catalogue) {
-      this.catalogue.set(key, value);
-    } else if (this.catalogue instanceof BrowserCatalogue) {
-      this.catalogue.set(key, value);
-    }
+    this.catalogue.set(key, value);
   }
 
   /**
    * Get an entry from the catalogue
-   *
-   * @param key Entry key
    */
   getEntry(key: string): CacheEntry | undefined {
-    if (this.catalogue instanceof Catalogue || this.catalogue instanceof BrowserCatalogue) {
-      return this.catalogue.get(key);
-    }
-    return undefined;
+    return this.catalogue.get(key);
   }
 
   /**
    * Remove an entry from the catalogue
-   *
-   * @param key Entry key
    */
   removeEntry(key: string): void {
-    if (this.catalogue instanceof Catalogue || this.catalogue instanceof BrowserCatalogue) {
-      this.catalogue.delete(key);
-    }
+    this.catalogue.delete(key);
   }
 
   /**
    * Clear the cache
    */
   clear(): void {
-    if (isBrowser()) {
-      // Clear IndexedDB
-      clear().catch(error => {
-        logger.error('Error clearing IndexedDB:', error);
-      });
-
-      // Reset browser catalogue
-      if (this.catalogue instanceof BrowserCatalogue) {
-        this.catalogue.clear().catch(error => {
-          logger.error('Error clearing browser catalogue:', error);
-        });
-      }
-    } else {
-      // Clear file system
-      if (this.catalogue instanceof Catalogue) {
-        Object.keys(this.catalogue).forEach(key => {
-          const entry = this.catalogue[key];
-          try {
-            if (fs.existsSync(entry.path)) {
-              if (fs.statSync(entry.path).isDirectory()) {
-                fs.rmdirSync(entry.path, { recursive: true });
-              } else {
-                fs.unlinkSync(entry.path);
-              }
+    if (!this._browser) {
+      for (const entry of this.catalogue.values()) {
+        try {
+          if (entry.path && fs.existsSync(entry.path)) {
+            const stat = fs.statSync(entry.path);
+            if (stat.isDirectory()) {
+              fs.rmSync(entry.path, { recursive: true, force: true });
+            } else {
+              fs.unlinkSync(entry.path);
             }
-          } catch (error) {
-            logger.error(`Error removing ${entry.path}:`, error);
           }
-        });
-
-        // Reset catalogue by creating a new one
-        const cataloguePath = path.join(this.dir, 'catalogue.json');
-        this.catalogue = new Catalogue(cataloguePath);
+        } catch (error) {
+          logger.error(`Error removing ${entry.path}:`, error);
+        }
       }
+    }
+    for (const key of this.catalogue.keys()) {
+      this.catalogue.delete(key);
     }
   }
 
   /**
    * Calculate MD5 hash for a file
-   *
-   * @param filepath File path
-   * @param blocksize Block size for reading
    */
   static async md5(filepath: string, blocksize: number = 65536): Promise<string> {
     if (isBrowser()) {
-      // In browser, we need to use the Web Crypto API
-      try {
-        // Get the file data
-        const response = await fetch(filepath);
-        const arrayBuffer = await response.arrayBuffer();
-
-        // Calculate the MD5 hash
-        // Note: Web Crypto API doesn't support MD5 directly for security reasons
-        // We're using a workaround with SubtleCrypto's digest method with SHA-256
-        const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-        return hashHex;
-      } catch (error) {
-        console.error('Error calculating hash in browser:', error);
-        throw error;
-      }
-    } else {
-      // In Node.js, we can use the crypto module
-      return new Promise((resolve, reject) => {
-        const hash = crypto.createHash('md5');
-        const stream = fs.createReadStream(filepath, { highWaterMark: blocksize });
-
-        stream.on('data', (chunk) => {
-          hash.update(chunk);
-        });
-
-        stream.on('end', () => {
-          resolve(hash.digest('hex'));
-        });
-
-        stream.on('error', (error: Error) => {
-          reject(error);
-        });
-      });
+      const response = await fetch(filepath);
+      const arrayBuffer = await response.arrayBuffer();
+      // Web Crypto does not expose MD5, so we fall back to SHA-256 in the browser.
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     }
+
+    return new Promise((resolve, reject) => {
+      const hash = crypto.createHash('md5');
+      const stream = fs.createReadStream(filepath, { highWaterMark: blocksize });
+      stream.on('data', (chunk) => hash.update(chunk));
+      stream.on('end', () => resolve(hash.digest('hex')));
+      stream.on('error', (error: Error) => reject(error));
+    });
   }
 }

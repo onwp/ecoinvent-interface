@@ -1,7 +1,9 @@
-import { get, set } from 'idb-keyval'; // Used in browser environments
 import * as fs from 'fs';
 import * as path from 'path';
 import envPaths from 'env-paths';
+import { getLogger } from '../utils/logger';
+
+const logger = getLogger('SettingsStorage');
 
 // Constants
 const STORAGE_PREFIX = 'ecoinvent_interface_';
@@ -10,7 +12,7 @@ const STORAGE_PREFIX = 'ecoinvent_interface_';
  * Determine if code is running in a browser environment
  */
 function isBrowser(): boolean {
-  return typeof window !== 'undefined' && typeof window.document !== 'undefined';
+  return typeof window !== 'undefined';
 }
 
 /**
@@ -32,7 +34,7 @@ function getSecretsDir(): string {
       fs.mkdirSync(secretsDir, { recursive: true });
     } catch (error: any) {
       // In test environment, we might not have permission to create directories
-      console.warn(`Could not create secrets directory: ${error.message}`);
+      logger.warn(`Could not create secrets directory: ${error.message}`);
     }
   }
 
@@ -47,13 +49,16 @@ function getSecretsDir(): string {
  */
 export function storeSettingPermanently(key: string, value: string): void {
   if (isBrowser()) {
-    // Store in browser localStorage
-    localStorage.setItem(`${STORAGE_PREFIX}${key}`, value);
+    const ls = (globalThis as any).localStorage;
+    if (!ls) {
+      throw new Error('localStorage is not available in this environment');
+    }
+    ls.setItem(`${STORAGE_PREFIX}${key}`, value);
   } else {
     // Store in file system
     const secretsDir = getSecretsDir();
     const filePath = path.join(secretsDir, `EI_${key}`);
-    fs.writeFileSync(filePath, value, 'utf8');
+    fs.writeFileSync(filePath, value);
   }
 }
 
@@ -65,8 +70,9 @@ export function storeSettingPermanently(key: string, value: string): void {
  */
 export function getStoredSetting(key: string): string | undefined {
   if (isBrowser()) {
-    // Get from browser localStorage
-    return localStorage.getItem(`${STORAGE_PREFIX}${key}`) || undefined;
+    const ls = (globalThis as any).localStorage;
+    if (!ls) return undefined;
+    return ls.getItem(`${STORAGE_PREFIX}${key}`) || undefined;
   } else {
     // Get from file system
     try {
@@ -76,7 +82,7 @@ export function getStoredSetting(key: string): string | undefined {
         return fs.readFileSync(filePath, 'utf8');
       }
     } catch (error) {
-      console.error(`Error reading setting ${key}:`, error);
+      logger.error(`Error reading setting ${key}:`, error);
     }
     return undefined;
   }

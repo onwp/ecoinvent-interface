@@ -1,13 +1,10 @@
 import axios from 'axios';
 import { Settings } from './settings';
 import { CachedStorage } from '../storage/cached-storage';
-import { URLS, FileMetadata } from '../types';
+import { URLS, FileMetadata, SYSTEM_MODELS } from '../types';
 import { getLogger } from '../utils/logger';
+import { VERSION } from '../utils/version';
 
-// Define version here to avoid circular dependencies
-const VERSION = '1.1.0';
-
-// Initialize logger
 const logger = getLogger('InterfaceBase');
 
 /**
@@ -85,6 +82,8 @@ export class InterfaceBase {
   accessToken?: string;
   refreshToken?: string;
   lastRefresh?: number;
+  private _filesCache?: any;
+  private _filesCacheAt?: number;
 
   /**
    * Create a new InterfaceBase instance
@@ -226,7 +225,7 @@ export class InterfaceBase {
       ...this.customHeaders,
     };
 
-    console.log(`Requesting URL: ${reportsUrl}`);
+    logger.debug(`Requesting URL: ${reportsUrl}`);
 
     const response = await axios.get(reportsUrl, {
       headers,
@@ -237,10 +236,23 @@ export class InterfaceBase {
   }
 
   /**
-   * Get all files from the API
+   * Get all files from the API. Result is cached in-memory for a short
+   * window to avoid redundant round-trips within a single workflow
+   * (e.g. `setRelease` -> `listVersions` + `listSystemModels`).
    */
   @freshLogin()
   async _getAllFiles(): Promise<any> {
+    // Cache is valid for 60 seconds; shorter than the token refresh window.
+    const CACHE_TTL_MS = 60_000;
+    const now = Date.now();
+    if (
+      this._filesCache !== undefined &&
+      this._filesCacheAt !== undefined &&
+      now - this._filesCacheAt < CACHE_TTL_MS
+    ) {
+      return this._filesCache;
+    }
+
     const filesUrl = `${this.urls.api}files`;
     const headers = {
       'Authorization': `Bearer ${this.accessToken}`,
@@ -249,12 +261,15 @@ export class InterfaceBase {
       ...this.customHeaders,
     };
 
-    console.log(`Requesting URL: ${filesUrl}`);
+    logger.debug(`Requesting URL: ${filesUrl}`);
 
     const response = await axios.get(filesUrl, {
       headers,
       timeout: 20000,
     });
+
+    this._filesCache = response.data;
+    this._filesCacheAt = now;
 
     return response.data;
   }
@@ -338,11 +353,10 @@ export class InterfaceBase {
 
       await pipeline(response.data, createWriteStream(outputPath));
 
-      console.log(`Downloaded file with _streamingDownload.
-        Filename: ${filename}
-        Directory: ${directory}
-        File size (bytes): ${fs.statSync(outputPath).size}
-      `);
+      logger.debug(
+        `Downloaded ${filename} to ${directory} ` +
+        `(${fs.statSync(outputPath).size} bytes)`,
+      );
 
       if (zipped) {
         // Unzip the file
@@ -357,23 +371,18 @@ export class InterfaceBase {
         fs.unlinkSync(outputPath);
       }
     } else {
-      // Browser environment
-      console.log(`Browser download requested for ${url}`);
+      logger.debug(`Browser download requested for ${url}`);
 
-      // For browser environments, we'll use a simpler approach
-      // that doesn't require modifying the CachedStorage interface
       const downloadUrl = new URL(url);
       Object.entries(params).forEach(([key, value]) => {
         downloadUrl.searchParams.append(key, value);
       });
 
-      // Open the download in a new tab
+      // Open the download in a new tab. Browsers will handle the save
+      // prompt natively; we cannot block on completion.
       window.open(downloadUrl.toString(), '_blank');
 
-      console.log(`Initiated browser download for ${filename}`);
-
-      // Return a placeholder path
-      return;
+      logger.info(`Initiated browser download for ${filename}`);
     }
   }
 
@@ -396,7 +405,6 @@ export class InterfaceBase {
     let releases = files.releases.map((obj: any) => obj.system_model_name);
 
     if (translate) {
-      const { SYSTEM_MODELS } = await import('../types');
       releases = releases.map((key: string) => SYSTEM_MODELS[key] || key);
     }
 

@@ -32,6 +32,11 @@ describe('EcoinventProcess', () => {
   let settings: Settings;
 
   beforeEach(() => {
+    // Reset *implementations* (not just call history) so that per-test
+    // `mockResolvedValueOnce` queues don't leak between tests.
+    mockedAxios.post.mockReset();
+    mockedAxios.get.mockReset();
+
     settings = new Settings({
       username: 'test-user',
       password: 'test-password',
@@ -62,7 +67,7 @@ describe('EcoinventProcess', () => {
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('setRelease', () => {

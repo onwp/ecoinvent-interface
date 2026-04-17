@@ -2,11 +2,8 @@ import axios from 'axios';
 import { InterfaceBase } from '../core/interface-base';
 import { SYSTEM_MODELS } from '../types';
 import { getLogger } from '../utils/logger';
+import { VERSION } from '../utils/version';
 
-// Define version here to avoid circular dependencies
-const VERSION = '1.1.0';
-
-// Initialize logger
 const logger = getLogger('EcoinventProcess');
 
 /**
@@ -69,7 +66,7 @@ function selectedProcess() {
   return function(_target: any, _propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
 
-    descriptor.value = function(...args: any[]) {
+    descriptor.value = async function(...args: any[]) {
       // 'this' refers to the instance when the method is called
       const instance = this as EcoinventProcess;
       if (!instance.datasetId) {
